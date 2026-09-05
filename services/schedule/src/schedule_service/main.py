@@ -1,8 +1,7 @@
-from fastapi import FastAPI
+from schedule_service.app import create_app
+from schedule_service.config import Settings
+from schedule_service.infrastructure.database import create_engine
 
-app = FastAPI(title="OG1 Schedule Service")
-
-
-@app.get("/health/live")
-async def health_live() -> dict[str, str]:
-    return {"status": "ok"}
+settings = Settings()
+engine = create_engine(settings.database_url)
+app = create_app(settings, engine)
