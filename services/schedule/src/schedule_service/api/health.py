@@ -17,7 +17,7 @@ async def health_ready(request: Request) -> dict[str, str]:
     try:
         async with engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
-    except SQLAlchemyError as exc:
+    except (OSError, SQLAlchemyError) as exc:
         raise HTTPException(status_code=503, detail="Database is unavailable") from exc
 
     return {"status": "ok"}
