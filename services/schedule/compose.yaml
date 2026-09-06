@@ -14,5 +14,39 @@ services:
       retries: 10
       start_period: 5s
 
+  migrations:
+    build:
+      context: .
+    env_file:
+      - .env
+      - .postgres.env
+    command:
+      - /bin/sh
+      - -c
+      - >
+        DATABASE_URL="postgresql+asyncpg://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres:5432/$${POSTGRES_DB}"
+        poetry run alembic upgrade head
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+    env_file:
+      - .env
+      - .postgres.env
+    command:
+      - /bin/sh
+      - -c
+      - >
+        DATABASE_URL="postgresql+asyncpg://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres:5432/$${POSTGRES_DB}"
+        exec poetry run uvicorn schedule_service.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
 volumes:
   postgres_data:
