@@ -6,7 +6,7 @@ import pytest
 from schedule_service.domain.lesson import Lesson
 
 
-class FakeLessons:
+class FakeLessonRepository:
     def __init__(self) -> None:
         self.saved: Lesson | None = None
 
@@ -27,7 +27,7 @@ class FakeLessons:
 
 class FakeUnitOfWork:
     def __init__(self) -> None:
-        self.lessons = FakeLessons()
+        self.lessons = FakeLessonRepository()
 
     async def __aenter__(self) -> Self:
         return self

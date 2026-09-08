@@ -1,0 +1,2 @@
+class ScheduleConflict(Exception):
+    pass

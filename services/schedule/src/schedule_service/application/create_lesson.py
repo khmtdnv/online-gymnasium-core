@@ -1,8 +1,7 @@
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol, Self
 
+from schedule_service.application.ports.unit_of_work import UnitOfWorkFactory
 from schedule_service.domain.lesson import Lesson
 
 
@@ -13,21 +12,6 @@ class CreateLessonCommand:
     subject_id: int
     starts_at: datetime
     ends_at: datetime
-
-
-class LessonRepository(Protocol):
-    async def add(self, lesson: Lesson) -> Lesson: ...
-
-
-class UnitOfWork(Protocol):
-    lessons: LessonRepository
-
-    async def __aenter__(self) -> Self: ...
-
-    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...
-
-
-type UnitOfWorkFactory = Callable[[], UnitOfWork]
 
 
 class CreateLessonHandler:
