@@ -41,3 +41,30 @@ def test_equal_timerange_raises_domain_error() -> None:
             starts_at=instant,
             ends_at=instant,
         )
+
+
+def test_reschedule_changes_interval_and_preserves_other_lesson_data() -> None:
+    lesson = Lesson(
+        id=501,
+        class_id=10,
+        teacher_id=100,
+        subject_id=1000,
+        starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+        status="planned",
+        version=3,
+    )
+
+    lesson.reschedule(
+        starts_at=datetime(2026, 9, 10, 12, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 13, tzinfo=UTC),
+    )
+
+    assert lesson.starts_at == datetime(2026, 9, 10, 12, tzinfo=UTC)
+    assert lesson.ends_at == datetime(2026, 9, 10, 13, tzinfo=UTC)
+    assert lesson.id == 501
+    assert lesson.class_id == 10
+    assert lesson.teacher_id == 100
+    assert lesson.subject_id == 1000
+    assert lesson.status == "planned"
+    assert lesson.version == 3

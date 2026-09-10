@@ -33,3 +33,10 @@ class Lesson:
             starts_at=starts_at,
             ends_at=ends_at,
         )
+
+    def reschedule(self, starts_at: datetime, ends_at: datetime) -> None:
+        if starts_at >= ends_at:
+            raise InvalidLessonInterval
+
+        self.starts_at = starts_at
+        self.ends_at = ends_at
