@@ -10,6 +10,10 @@ class InvalidLessonInterval(DomainException):
     pass
 
 
+class LessonAlreadyCanceled(DomainException):
+    pass
+
+
 @dataclass
 class Lesson:
     class_id: int
@@ -40,3 +44,9 @@ class Lesson:
 
         self.starts_at = starts_at
         self.ends_at = ends_at
+
+    def cancel(self) -> None:
+        if self.status == "canceled":
+            raise LessonAlreadyCanceled
+
+        self.status = "canceled"

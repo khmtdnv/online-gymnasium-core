@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from schedule_service.domain.lesson import InvalidLessonInterval, Lesson
+from schedule_service.domain.lesson import InvalidLessonInterval, Lesson, LessonAlreadyCanceled
 
 
 def test_valid_data_created_valid_domain_object() -> None:
@@ -68,3 +68,25 @@ def test_reschedule_changes_interval_and_preserves_other_lesson_data() -> None:
     assert lesson.subject_id == 1000
     assert lesson.status == "planned"
     assert lesson.version == 3
+
+
+def test_cancel_changes_status_and_rejects_second_cancellation() -> None:
+    lesson = Lesson(
+        id=501,
+        class_id=10,
+        teacher_id=100,
+        subject_id=1000,
+        starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+        status="planned",
+        version=3,
+    )
+
+    lesson.cancel()
+
+    assert lesson.status == "canceled"
+    assert lesson.id == 501
+    assert lesson.version == 3
+
+    with pytest.raises(LessonAlreadyCanceled):
+        lesson.cancel()

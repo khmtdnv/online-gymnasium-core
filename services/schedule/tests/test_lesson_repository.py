@@ -211,3 +211,68 @@ async def test_repository_translates_update_integrity_error_to_schedule_conflict
         await repository.update(lesson, expected_version=3)
 
     assert error.value.__cause__ is database_error
+
+
+@pytest.mark.anyio
+async def test_repository_cancels_planned_lesson_and_returns_new_version() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    scalar_result = Mock()
+    session.scalars.return_value = scalar_result
+    scalar_result.one_or_none.return_value = ScheduledLessonRow(
+        id=501,
+        class_id=10,
+        teacher_id=100,
+        subject_id=1000,
+        starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+        status="canceled",
+        version=4,
+    )
+    repository = SqlAlchemyLessonRepository(session)
+    lesson = Lesson(
+        id=501,
+        class_id=10,
+        teacher_id=100,
+        subject_id=1000,
+        starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+        status="canceled",
+        version=3,
+    )
+
+    result = await repository.cancel(lesson, expected_version=3)
+
+    session.scalars.assert_awaited_once()
+    assert result == Lesson(
+        id=501,
+        class_id=10,
+        teacher_id=100,
+        subject_id=1000,
+        starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+        status="canceled",
+        version=4,
+    )
+
+
+@pytest.mark.anyio
+async def test_repository_cancel_returns_none_when_row_is_no_longer_planned() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    scalar_result = Mock()
+    session.scalars.return_value = scalar_result
+    scalar_result.one_or_none.return_value = None
+    repository = SqlAlchemyLessonRepository(session)
+    lesson = Lesson(
+        id=501,
+        class_id=10,
+        teacher_id=100,
+        subject_id=1000,
+        starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+        status="canceled",
+        version=3,
+    )
+
+    result = await repository.cancel(lesson, expected_version=3)
+
+    assert result is None

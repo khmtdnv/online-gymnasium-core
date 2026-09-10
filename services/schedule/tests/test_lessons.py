@@ -79,6 +79,47 @@ class ConflictingUpdateLessonRepository(UpdatingLessonRepository):
         raise ScheduleConflict
 
 
+class CancelingLessonRepository:
+    async def get(self, lesson_id: int) -> Lesson | None:
+        if lesson_id != 501:
+            return None
+        return Lesson(
+            id=501,
+            class_id=10,
+            teacher_id=100,
+            subject_id=1000,
+            starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+            ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+            status="planned",
+            version=3,
+        )
+
+    async def cancel(self, lesson: Lesson, expected_version: int) -> Lesson | None:
+        return Lesson(
+            id=lesson.id,
+            class_id=lesson.class_id,
+            teacher_id=lesson.teacher_id,
+            subject_id=lesson.subject_id,
+            starts_at=lesson.starts_at,
+            ends_at=lesson.ends_at,
+            status="canceled",
+            version=4,
+        )
+
+
+class StaleCancelingLessonRepository(CancelingLessonRepository):
+    async def cancel(self, lesson: Lesson, expected_version: int) -> Lesson | None:
+        return None
+
+
+class AlreadyCanceledLessonRepository(CancelingLessonRepository):
+    async def get(self, lesson_id: int) -> Lesson | None:
+        lesson = await super().get(lesson_id)
+        if lesson is not None:
+            lesson.status = "canceled"
+        return lesson
+
+
 def test_create_lesson_endpoint() -> None:
     test_app_name = "Test Schedule Service"
     test_settings = Settings(
@@ -313,3 +354,88 @@ def test_update_lesson_returns_conflict_for_schedule_conflict() -> None:
 
     assert response.status_code == 409
     assert response.json() == {"detail": "Lesson conflicts with existing schedule"}
+
+
+def test_cancel_lesson_endpoint() -> None:
+    settings = Settings(
+        app_name="Test Schedule Service",
+        database_url="postgresql+asyncpg://schedule:password@localhost:5432/schedule",
+        redis_url="test_url",
+        rabbitmq_url="test_url",
+    )
+    engine = create_engine(url=settings.database_url)
+    fake_uow = FakeUnitOfWork()
+    fake_uow.lessons = CancelingLessonRepository()
+    app = create_app(settings, engine, lambda: fake_uow)
+
+    with TestClient(app) as client:
+        response = client.post("/lessons/501/cancel", json={"expected_version": 3})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": 501,
+        "class_id": 10,
+        "teacher_id": 100,
+        "subject_id": 1000,
+        "starts_at": "2026-09-10T10:00:00Z",
+        "ends_at": "2026-09-10T11:00:00Z",
+        "status": "canceled",
+        "version": 4,
+    }
+
+
+def test_cancel_lesson_returns_not_found_for_missing_lesson() -> None:
+    settings = Settings(
+        app_name="Test Schedule Service",
+        database_url="postgresql+asyncpg://schedule:password@localhost:5432/schedule",
+        redis_url="test_url",
+        rabbitmq_url="test_url",
+    )
+    engine = create_engine(url=settings.database_url)
+    fake_uow = FakeUnitOfWork()
+    fake_uow.lessons = CancelingLessonRepository()
+    app = create_app(settings, engine, lambda: fake_uow)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/lessons/999/cancel", json={"expected_version": 3})
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Lesson not found"}
+
+
+def test_cancel_lesson_returns_conflict_for_stale_version() -> None:
+    settings = Settings(
+        app_name="Test Schedule Service",
+        database_url="postgresql+asyncpg://schedule:password@localhost:5432/schedule",
+        redis_url="test_url",
+        rabbitmq_url="test_url",
+    )
+    engine = create_engine(url=settings.database_url)
+    fake_uow = FakeUnitOfWork()
+    fake_uow.lessons = StaleCancelingLessonRepository()
+    app = create_app(settings, engine, lambda: fake_uow)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/lessons/501/cancel", json={"expected_version": 2})
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Lesson version conflict"}
+
+
+def test_cancel_lesson_returns_conflict_when_already_canceled() -> None:
+    settings = Settings(
+        app_name="Test Schedule Service",
+        database_url="postgresql+asyncpg://schedule:password@localhost:5432/schedule",
+        redis_url="test_url",
+        rabbitmq_url="test_url",
+    )
+    engine = create_engine(url=settings.database_url)
+    fake_uow = FakeUnitOfWork()
+    fake_uow.lessons = AlreadyCanceledLessonRepository()
+    app = create_app(settings, engine, lambda: fake_uow)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/lessons/501/cancel", json={"expected_version": 3})
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Lesson is already canceled"}

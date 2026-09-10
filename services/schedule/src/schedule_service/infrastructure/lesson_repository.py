@@ -94,3 +94,35 @@ class SqlAlchemyLessonRepository:
             status=row.status,
             version=row.version,
         )
+
+    async def cancel(self, lesson: Lesson, expected_version: int) -> Lesson | None:
+        statement = (
+            update(ScheduledLessonRow)
+            .where(
+                ScheduledLessonRow.id == lesson.id,
+                ScheduledLessonRow.version == expected_version,
+                ScheduledLessonRow.status == "planned",
+            )
+            .values(
+                status=lesson.status,
+                version=ScheduledLessonRow.version + 1,
+            )
+            .returning(ScheduledLessonRow)
+        )
+
+        scalar_result = await self._session.scalars(statement)
+        row = scalar_result.one_or_none()
+
+        if row is None:
+            return None
+
+        return Lesson(
+            id=row.id,
+            class_id=row.class_id,
+            teacher_id=row.teacher_id,
+            subject_id=row.subject_id,
+            starts_at=row.starts_at,
+            ends_at=row.ends_at,
+            status=row.status,
+            version=row.version,
+        )

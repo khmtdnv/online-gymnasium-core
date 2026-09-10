@@ -4,11 +4,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from schedule_service.api.dependencies import get_create_lesson_handler, get_update_lesson_handler
+from schedule_service.api.dependencies import (
+    get_cancel_lesson_handler,
+    get_create_lesson_handler,
+    get_update_lesson_handler,
+)
+from schedule_service.application.cancel_lesson import CancelLessonCommand, CancelLessonHandler
 from schedule_service.application.create_lesson import CreateLessonCommand, CreateLessonHandler
 from schedule_service.application.errors import LessonNotFound, ScheduleConflict, VersionConflict
 from schedule_service.application.update_lesson import UpdateLessonCommand, UpdateLessonHandler
-from schedule_service.domain.lesson import InvalidLessonInterval
+from schedule_service.domain.lesson import InvalidLessonInterval, LessonAlreadyCanceled
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
 
@@ -24,6 +29,10 @@ class CreateLessonRequest(BaseModel):
 class UpdateLessonRequest(BaseModel):
     starts_at: datetime
     ends_at: datetime
+    expected_version: int
+
+
+class CancelLessonRequest(BaseModel):
     expected_version: int
 
 
@@ -98,4 +107,33 @@ async def update_lesson(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Lesson conflicts with existing schedule",
+        ) from exc
+
+
+@router.post("/{lesson_id}/cancel", response_model=LessonResponse)
+async def cancel_lesson(
+    lesson_id: int,
+    request_model: CancelLessonRequest,
+    handler: Annotated[CancelLessonHandler, Depends(get_cancel_lesson_handler)],
+):
+    command = CancelLessonCommand(
+        lesson_id=lesson_id,
+        expected_version=request_model.expected_version,
+    )
+    try:
+        return await handler.handle(command)
+    except LessonAlreadyCanceled as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Lesson is already canceled",
+        ) from exc
+    except LessonNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found",
+        ) from exc
+    except VersionConflict as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Lesson version conflict",
         ) from exc
