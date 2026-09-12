@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from schedule_service.config import Settings
 from schedule_service.infrastructure.models.base import Base
+from schedule_service.infrastructure.models.idempotency_request import IdempotencyRequestRow  # noqa: F401
 from schedule_service.infrastructure.models.scheduled_lesson import ScheduledLessonRow  # noqa: F401
 
 config = context.config

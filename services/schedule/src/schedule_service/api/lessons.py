@@ -1,7 +1,9 @@
+import hashlib
+import json
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
 from schedule_service.api.dependencies import (
@@ -11,7 +13,7 @@ from schedule_service.api.dependencies import (
 )
 from schedule_service.application.cancel_lesson import CancelLessonCommand, CancelLessonHandler
 from schedule_service.application.create_lesson import CreateLessonCommand, CreateLessonHandler
-from schedule_service.application.errors import LessonNotFound, ScheduleConflict, VersionConflict
+from schedule_service.application.errors import IdempotencyKeyReuse, LessonNotFound, ScheduleConflict, VersionConflict
 from schedule_service.application.update_lesson import UpdateLessonCommand, UpdateLessonHandler
 from schedule_service.domain.lesson import InvalidLessonInterval, LessonAlreadyCanceled
 
@@ -51,13 +53,19 @@ class LessonResponse(BaseModel):
 async def create_lesson(
     request_model: CreateLessonRequest,
     handler: Annotated[CreateLessonHandler, Depends(get_create_lesson_handler)],
+    idempotency_key: Annotated[str | None, Header()] = None,
 ):
+    payload = request_model.model_dump(mode="json")
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    request_hash = hashlib.sha256(serialized.encode()).hexdigest()
     command = CreateLessonCommand(
         class_id=request_model.class_id,
         teacher_id=request_model.teacher_id,
         subject_id=request_model.subject_id,
         starts_at=request_model.starts_at,
         ends_at=request_model.ends_at,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
     )
     try:
         response = await handler.handle(command)
@@ -71,6 +79,12 @@ async def create_lesson(
             status_code=status.HTTP_409_CONFLICT,
             detail="Lesson conflicts with existing schedule",
         ) from exc
+    except IdempotencyKeyReuse as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Idempotency key was already used for another request",
+        ) from exc
+
     return response
 
 

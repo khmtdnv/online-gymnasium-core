@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from schedule_service.application.errors import IdempotencyKeyReuse
 from schedule_service.application.ports.unit_of_work import UnitOfWorkFactory
 from schedule_service.domain.lesson import Lesson
 
@@ -12,6 +13,8 @@ class CreateLessonCommand:
     subject_id: int
     starts_at: datetime
     ends_at: datetime
+    idempotency_key: str | None = None
+    request_hash: str | None = None
 
 
 class CreateLessonHandler:
@@ -19,13 +22,31 @@ class CreateLessonHandler:
         self._uow_factory = uow_factory
 
     async def handle(self, command: CreateLessonCommand) -> Lesson:
-        lesson = Lesson.create(
-            class_id=command.class_id,
-            teacher_id=command.teacher_id,
-            subject_id=command.subject_id,
-            starts_at=command.starts_at,
-            ends_at=command.ends_at,
-        )
-
         async with self._uow_factory() as uow:
-            return await uow.lessons.add(lesson)
+            if command.idempotency_key is not None:
+                assert command.request_hash is not None
+
+                record = await uow.idempotency.claim("create_lesson", command.idempotency_key, command.request_hash)
+
+                if record is not None:
+                    if record.request_hash != command.request_hash:
+                        raise IdempotencyKeyReuse
+
+                    assert record.lesson is not None
+                    return record.lesson
+
+            lesson = Lesson.create(
+                class_id=command.class_id,
+                teacher_id=command.teacher_id,
+                subject_id=command.subject_id,
+                starts_at=command.starts_at,
+                ends_at=command.ends_at,
+            )
+
+            db_lesson = await uow.lessons.add(lesson)
+
+            if command.idempotency_key is not None:
+                assert command.request_hash is not None
+                await uow.idempotency.complete("create_lesson", command.idempotency_key, db_lesson)
+
+            return db_lesson

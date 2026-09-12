@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Self
 
@@ -6,11 +7,38 @@ import pytest
 from schedule_service.domain.lesson import Lesson
 
 
+@dataclass
+class FakeIdempotencyRecord:
+    request_hash: str
+    lesson: Lesson | None = None
+
+
+class FakeIdempotencyRepository:
+    def __init__(self) -> None:
+        self.records: dict[tuple[str, str], FakeIdempotencyRecord] = {}
+
+    async def claim(self, operation: str, key: str, request_hash: str) -> FakeIdempotencyRecord | None:
+        record = self.records.get((operation, key))
+
+        if record is None:
+            self.records[(operation, key)] = FakeIdempotencyRecord(request_hash=request_hash)
+            return None
+
+        return record
+
+    async def complete(self, operation: str, key: str, lesson: Lesson) -> None:
+        record = self.records.get((operation, key))
+        assert record is not None
+        record.lesson = lesson
+
+
 class FakeLessonRepository:
     def __init__(self) -> None:
+        self.add_calls = 0
         self.saved: Lesson | None = None
 
     async def add(self, lesson: Lesson) -> Lesson:
+        self.add_calls += 1
         self.saved = lesson
 
         return Lesson(
@@ -28,6 +56,7 @@ class FakeLessonRepository:
 class FakeUnitOfWork:
     def __init__(self) -> None:
         self.lessons = FakeLessonRepository()
+        self.idempotency = FakeIdempotencyRepository()
 
     async def __aenter__(self) -> Self:
         return self
@@ -67,3 +96,79 @@ async def test_handler_creates_lesson_through_uow() -> None:
     assert saved.ends_at == command.ends_at
     assert saved.status == "planned"
     assert saved.version == 1
+
+
+@pytest.mark.anyio
+async def test_same_requests_are_idempotent() -> None:
+    from schedule_service.application.create_lesson import (
+        CreateLessonCommand,
+        CreateLessonHandler,
+    )
+
+    fake_uow = FakeUnitOfWork()
+    handler = CreateLessonHandler(uow_factory=lambda: fake_uow)
+
+    first_command = CreateLessonCommand(
+        class_id=1,
+        teacher_id=2,
+        subject_id=3,
+        starts_at=datetime(2026, 9, 10, 11, 30, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 12, 15, tzinfo=UTC),
+        idempotency_key="k1",
+        request_hash="h1",
+    )
+
+    second_command = CreateLessonCommand(
+        class_id=1,
+        teacher_id=2,
+        subject_id=3,
+        starts_at=datetime(2026, 9, 10, 11, 30, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 12, 15, tzinfo=UTC),
+        idempotency_key="k1",
+        request_hash="h1",
+    )
+
+    first_cmd_result = await handler.handle(first_command)
+    second_cmd_result = await handler.handle(second_command)
+
+    assert fake_uow.lessons.add_calls == 1
+
+    assert first_cmd_result == second_cmd_result
+
+
+@pytest.mark.anyio
+async def test_same_requests_with_different_hash_raises_error() -> None:
+    from schedule_service.application.create_lesson import (
+        CreateLessonCommand,
+        CreateLessonHandler,
+    )
+    from schedule_service.application.errors import IdempotencyKeyReuse
+
+    fake_uow = FakeUnitOfWork()
+    handler = CreateLessonHandler(uow_factory=lambda: fake_uow)
+
+    first_command = CreateLessonCommand(
+        class_id=1,
+        teacher_id=2,
+        subject_id=3,
+        starts_at=datetime(2026, 9, 10, 11, 30, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 12, 15, tzinfo=UTC),
+        idempotency_key="k1",
+        request_hash="h1",
+    )
+
+    second_command = CreateLessonCommand(
+        class_id=1,
+        teacher_id=2,
+        subject_id=3,
+        starts_at=datetime(2026, 9, 10, 11, 30, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 12, 15, tzinfo=UTC),
+        idempotency_key="k1",
+        request_hash="h2",
+    )
+
+    await handler.handle(first_command)
+    with pytest.raises(IdempotencyKeyReuse):
+        await handler.handle(second_command)
+
+    assert fake_uow.lessons.add_calls == 1

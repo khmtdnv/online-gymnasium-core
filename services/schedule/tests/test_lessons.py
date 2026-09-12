@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Self
 
@@ -10,11 +11,38 @@ from schedule_service.domain.lesson import Lesson
 from schedule_service.infrastructure.database import create_engine
 
 
+@dataclass
+class FakeIdempotencyRecord:
+    request_hash: str
+    lesson: Lesson | None = None
+
+
+class FakeIdempotencyRepository:
+    def __init__(self) -> None:
+        self.records: dict[tuple[str, str], FakeIdempotencyRecord] = {}
+
+    async def claim(self, operation: str, key: str, request_hash: str) -> FakeIdempotencyRecord | None:
+        record = self.records.get((operation, key))
+
+        if record is None:
+            self.records[(operation, key)] = FakeIdempotencyRecord(request_hash=request_hash)
+            return None
+
+        return record
+
+    async def complete(self, operation: str, key: str, lesson: Lesson) -> None:
+        record = self.records.get((operation, key))
+        assert record is not None
+        record.lesson = lesson
+
+
 class FakeLessonRepository:
     def __init__(self) -> None:
+        self.add_calls = 0
         self.saved: Lesson | None = None
 
     async def add(self, lesson: Lesson) -> Lesson:
+        self.add_calls += 1
         self.saved = lesson
 
         return Lesson(
@@ -32,6 +60,7 @@ class FakeLessonRepository:
 class FakeUnitOfWork:
     def __init__(self) -> None:
         self.lessons = FakeLessonRepository()
+        self.idempotency = FakeIdempotencyRepository()
 
     async def __aenter__(self) -> Self:
         return self
@@ -439,3 +468,39 @@ def test_cancel_lesson_returns_conflict_when_already_canceled() -> None:
 
     assert response.status_code == 409
     assert response.json() == {"detail": "Lesson is already canceled"}
+
+
+def test_create_lesson_rejects_reused_idempotency_key_for_different_request() -> None:
+    settings = Settings(
+        app_name="Test Schedule Service",
+        database_url="postgresql+asyncpg://schedule:password@localhost:5432/schedule",
+        redis_url="test_url",
+        rabbitmq_url="test_url",
+    )
+    engine = create_engine(url=settings.database_url)
+    fake_uow = FakeUnitOfWork()
+    app = create_app(settings, engine, lambda: fake_uow)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        original_request_body = {
+            "class_id": 10,
+            "teacher_id": 100,
+            "subject_id": 1000,
+            "starts_at": "2026-09-08T10:00:00Z",
+            "ends_at": "2026-09-08T11:00:00Z",
+        }
+        first_response = client.post("/lessons", headers={"Idempotency-Key": "k1"}, json=original_request_body)
+
+        different_request_body = {
+            "class_id": 10,
+            "teacher_id": 100,
+            "subject_id": 1000,
+            "starts_at": "2026-09-08T12:00:00Z",
+            "ends_at": "2026-09-08T13:00:00Z",
+        }
+        second_response = client.post("/lessons", headers={"Idempotency-Key": "k1"}, json=different_request_body)
+
+    assert first_response.status_code == 201
+    assert fake_uow.lessons.add_calls == 1
+    assert second_response.status_code == 409
+    assert second_response.json() == {"detail": "Idempotency key was already used for another request"}

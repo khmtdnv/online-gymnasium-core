@@ -12,3 +12,7 @@ class LessonNotFound(ApplicationException):
 
 class VersionConflict(ApplicationException):
     pass
+
+
+class IdempotencyKeyReuse(ApplicationException):
+    pass

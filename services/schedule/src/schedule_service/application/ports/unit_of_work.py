@@ -1,11 +1,13 @@
 from collections.abc import Callable
 from typing import Protocol, Self
 
+from schedule_service.application.ports.idempotency_repository import IdempotencyRepository
 from schedule_service.application.ports.lesson_repository import LessonRepository
 
 
 class UnitOfWork(Protocol):
     lessons: LessonRepository
+    idempotency: IdempotencyRepository
 
     async def __aenter__(self) -> Self: ...
 
