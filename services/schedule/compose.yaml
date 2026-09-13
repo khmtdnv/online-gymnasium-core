@@ -60,6 +60,25 @@ services:
       postgres:
         condition: service_healthy
 
+  outbox-relay:
+    build:
+      context: .
+    env_file:
+      - .env
+      - .postgres.env
+    command:
+      - /bin/sh
+      - -c
+      - >
+        DATABASE_URL="postgresql+asyncpg://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres:5432/$${POSTGRES_DB}"
+        KAFKA_BOOTSTRAP_SERVERS="kafka:19092"
+        exec poetry run python -m schedule_service.workers.outbox_relay
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+
   api:
     build:
       context: .
