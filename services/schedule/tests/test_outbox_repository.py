@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -30,7 +31,7 @@ async def test_repository_adds_json_snapshot_of_lesson_created_event_to_session(
     assert isinstance(row, OutboxEventRow)
     assert row.event_type == "lesson.created"
     assert row.payload == {
-        "id": 501,
+        "lesson_id": 501,
         "class_id": 10,
         "teacher_id": 100,
         "subject_id": 1000,
@@ -40,3 +41,60 @@ async def test_repository_adds_json_snapshot_of_lesson_created_event_to_session(
         "version": 1,
     }
     session.add.assert_called_once_with(row)
+
+
+@pytest.mark.anyio
+async def test_repository_returns_pending_events_in_id_order() -> None:
+    from schedule_service.infrastructure.models.outbox_event import OutboxEventRow
+    from schedule_service.infrastructure.outbox_repository import SqlAlchemyOutboxRepository
+
+    session = AsyncMock(spec=AsyncSession)
+    scalar_result = Mock()
+    session.scalars.return_value = scalar_result
+    scalar_result.all.return_value = [
+        OutboxEventRow(
+            id=7,
+            event_type="lesson.created",
+            payload={"lesson_id": 501},
+            created_at=datetime(2026, 9, 13, 10, tzinfo=UTC),
+        ),
+        OutboxEventRow(
+            id=8,
+            event_type="lesson.created",
+            payload={"lesson_id": 502},
+            created_at=datetime(2026, 9, 13, 11, tzinfo=UTC),
+        ),
+    ]
+    repository = SqlAlchemyOutboxRepository(session)
+
+    events = await repository.get_pending(limit=100)
+
+    assert [event.id for event in events] == [7, 8]
+    assert events[0].event_type == "lesson.created"
+    assert events[0].payload == {"lesson_id": 501}
+    assert events[0].created_at == datetime(2026, 9, 13, 10, tzinfo=UTC)
+    session.scalars.assert_awaited_once()
+    statement = session.scalars.await_args.args[0]
+    sql = str(statement.compile(dialect=postgresql.dialect()))
+    assert "ORDER BY outbox_events.id" in sql
+
+
+@pytest.mark.anyio
+async def test_repository_marks_only_pending_event_as_published() -> None:
+    from schedule_service.infrastructure.outbox_repository import SqlAlchemyOutboxRepository
+
+    session = AsyncMock(spec=AsyncSession)
+    repository = SqlAlchemyOutboxRepository(session)
+
+    await repository.mark_published(event_id=7)
+
+    statement = session.execute.await_args.args[0]
+    sql = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "UPDATE outbox_events SET published_at=now()" in sql
+    assert "outbox_events.id = 7" in sql
+    assert "outbox_events.published_at IS NULL" in sql
