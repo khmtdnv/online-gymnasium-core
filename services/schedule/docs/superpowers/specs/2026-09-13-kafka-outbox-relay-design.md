@@ -2,15 +2,16 @@
 
 ## Goal
 
-Deliver committed schedule-domain events from PostgreSQL outbox rows to Kafka
+Deliver committed `lesson.created` events from PostgreSQL outbox rows to Kafka
 without making the HTTP API dependent on Kafka availability. This slice stops
-after publishing to Kafka. Analytics and ClickHouse consumers are explicitly
-out of scope.
+after publishing to Kafka. Analytics, ClickHouse consumers, and emitting
+`lesson.rescheduled` or `lesson.canceled` are explicitly out of scope.
 
 ## Decisions
 
 - Run exactly one long-lived `outbox-relay` process in local Compose.
-- Publish every schedule-domain event to the single topic `schedule.lessons`.
+- Publish the currently emitted `lesson.created` events to the single topic
+  `schedule.lessons`.
 - Use the lesson id as the Kafka message key. This preserves write order for a
   given lesson within its Kafka partition.
 - Use `event_id`, the primary key of `outbox_events`, as the idempotency key
@@ -19,6 +20,10 @@ out of scope.
   must not be silently discarded.
 - Use the asynchronous Python client `aiokafka` and the pinned official Docker
   image `apache/kafka:4.3.1` for local development.
+
+Future `lesson.rescheduled` and `lesson.canceled` events will use this same
+topic, envelope, key, and relay. Their handlers must first add corresponding
+outbox rows inside their existing lesson transactions.
 
 ## Message contract
 
