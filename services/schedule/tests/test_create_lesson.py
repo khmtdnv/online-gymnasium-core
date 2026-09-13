@@ -53,10 +53,19 @@ class FakeLessonRepository:
         )
 
 
+class FakeOutboxRepository:
+    def __init__(self) -> None:
+        self.events: list[object] = []
+
+    async def add(self, event: object) -> None:
+        self.events.append(event)
+
+
 class FakeUnitOfWork:
     def __init__(self) -> None:
         self.lessons = FakeLessonRepository()
         self.idempotency = FakeIdempotencyRepository()
+        self.outbox = FakeOutboxRepository()
 
     async def __aenter__(self) -> Self:
         return self
@@ -99,6 +108,37 @@ async def test_handler_creates_lesson_through_uow() -> None:
 
 
 @pytest.mark.anyio
+async def test_handler_queues_lesson_created_event_after_creating_lesson() -> None:
+    from schedule_service.application.create_lesson import (
+        CreateLessonCommand,
+        CreateLessonHandler,
+    )
+
+    fake_uow = FakeUnitOfWork()
+    handler = CreateLessonHandler(uow_factory=lambda: fake_uow)
+    command = CreateLessonCommand(
+        class_id=10,
+        teacher_id=100,
+        subject_id=1000,
+        starts_at=datetime(2026, 9, 13, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 13, 11, tzinfo=UTC),
+    )
+
+    await handler.handle(command)
+
+    assert len(fake_uow.outbox.events) == 1
+    event = fake_uow.outbox.events[0]
+    assert event.lesson_id == 501
+    assert event.class_id == 10
+    assert event.teacher_id == 100
+    assert event.subject_id == 1000
+    assert event.starts_at == command.starts_at
+    assert event.ends_at == command.ends_at
+    assert event.status == "planned"
+    assert event.version == 1
+
+
+@pytest.mark.anyio
 async def test_same_requests_are_idempotent() -> None:
     from schedule_service.application.create_lesson import (
         CreateLessonCommand,
@@ -132,6 +172,7 @@ async def test_same_requests_are_idempotent() -> None:
     second_cmd_result = await handler.handle(second_command)
 
     assert fake_uow.lessons.add_calls == 1
+    assert len(fake_uow.outbox.events) == 1
 
     assert first_cmd_result == second_cmd_result
 

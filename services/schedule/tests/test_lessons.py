@@ -57,10 +57,19 @@ class FakeLessonRepository:
         )
 
 
+class FakeOutboxRepository:
+    def __init__(self) -> None:
+        self.events: list[object] = []
+
+    async def add(self, event: object) -> None:
+        self.events.append(event)
+
+
 class FakeUnitOfWork:
     def __init__(self) -> None:
         self.lessons = FakeLessonRepository()
         self.idempotency = FakeIdempotencyRepository()
+        self.outbox = FakeOutboxRepository()
 
     async def __aenter__(self) -> Self:
         return self

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from schedule_service.infrastructure.idempotency_repository import SqlAlchemyIdempotencyRepository
 from schedule_service.infrastructure.lesson_repository import SqlAlchemyLessonRepository
+from schedule_service.infrastructure.outbox_repository import SqlAlchemyOutboxRepository
 
 type AsyncSessionFactory = Callable[[], AsyncSession]
 
@@ -17,6 +18,7 @@ class SqlAlchemyUnitOfWork:
         self._session = self._session_factory()
         self.lessons = SqlAlchemyLessonRepository(self._session)
         self.idempotency = SqlAlchemyIdempotencyRepository(self._session)
+        self.outbox = SqlAlchemyOutboxRepository(self._session)
         return self
 
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:

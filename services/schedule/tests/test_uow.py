@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 async def test_uow_commits_and_closes_session_after_success() -> None:
     from schedule_service.infrastructure.idempotency_repository import SqlAlchemyIdempotencyRepository
     from schedule_service.infrastructure.lesson_repository import SqlAlchemyLessonRepository
+    from schedule_service.infrastructure.outbox_repository import SqlAlchemyOutboxRepository
     from schedule_service.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
     session = AsyncMock(spec=AsyncSession)
@@ -16,6 +17,7 @@ async def test_uow_commits_and_closes_session_after_success() -> None:
     async with uow:
         assert isinstance(uow.lessons, SqlAlchemyLessonRepository)
         assert isinstance(uow.idempotency, SqlAlchemyIdempotencyRepository)
+        assert isinstance(uow.outbox, SqlAlchemyOutboxRepository)
 
     session.commit.assert_awaited_once()
     session.rollback.assert_not_awaited()
