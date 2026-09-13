@@ -30,63 +30,34 @@
 | `src/schedule_service/infrastructure/outbox_repository.py` | Maps PostgreSQL rows to pending events and updates `published_at`. |
 | `src/schedule_service/infrastructure/kafka_event_publisher.py` | Serializes the Kafka envelope and calls `AIOKafkaProducer.send_and_wait`. |
 | `src/schedule_service/workers/outbox_relay.py` | Composition root and lifecycle for the relay process. |
-| `src/schedule_service/config.py` | Adds Kafka bootstrap-server configuration. |
+| `src/schedule_service/workers/config.py` | Defines worker-only `RelaySettings`, including Kafka bootstrap servers. |
 | `compose.yaml` | Adds one Kafka broker and one `outbox-relay` service. |
-| `.env.example`, `pyproject.toml`, `poetry.lock` | Adds local Kafka configuration and the locked `aiokafka` dependency. |
+| `pyproject.toml`, `poetry.lock` | Adds the locked `aiokafka` dependency. |
 | `tests/test_outbox_repository.py` | Verifies pending-row mapping and publication marking. |
 | `tests/test_outbox_relay.py` | Verifies publish order and failure semantics without Kafka. |
 | `tests/test_kafka_event_publisher.py` | Verifies Kafka key and JSON envelope against a mocked producer. |
-| `tests/test_config.py` | Extends settings construction with the Kafka endpoint. |
+| `tests/test_relay_config.py` | Verifies that worker-only settings receive the Kafka endpoint. |
 
-### Task 1: Add Kafka configuration and local Compose broker
+### Task 1: Add the Kafka client dependency and local Compose broker
 
 **Files:**
 - Modify: `pyproject.toml`
 - Modify: `poetry.lock`
-- Modify: `src/schedule_service/config.py`
-- Modify: `.env.example`
 - Modify: `compose.yaml`
-- Modify: `tests/test_config.py`
 
 **Interfaces:**
-- Produces `Settings.kafka_bootstrap_servers: str`.
 - Compose makes the host broker reachable at `localhost:9092` and containers at `kafka:19092`.
 - The official broker image is `apache/kafka:4.3.1`.
 
-- [ ] **Step 1 — Codex: extend the Settings contract test**
+- [x] **Step 1 — Learner: add the dependency**
 
-  Add `KAFKA_BOOTSTRAP_SERVERS` with `"localhost:9092"` through `monkeypatch`, then assert it is available on the created settings object.
-
-  ```python
-  monkeypatch.setenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-
-  settings = Settings()
-
-  assert settings.kafka_bootstrap_servers == "localhost:9092"
-  ```
-
-- [ ] **Step 2 — Codex: run the focused test and establish RED**
-
-  Run: `poetry run pytest tests/test_config.py -q`
-
-  Expected: failure because `Settings` has no `kafka_bootstrap_servers` attribute yet.
-
-- [ ] **Step 3 — Learner: add the configuration and dependency**
-
-  In `Settings`, add the required field:
-
-  ```python
-  kafka_bootstrap_servers: str
-  ```
-
-  Add `KAFKA_BOOTSTRAP_SERVERS=localhost:9092` to `.env.example`. Add
-  `aiokafka (>=0.14.0,<0.15.0)` as a main dependency with:
+  Add `aiokafka (>=0.14.0,<0.15.0)` as a main dependency with:
 
   ```bash
   poetry add aiokafka@^0.14.0
   ```
 
-- [ ] **Step 4 — Learner: add the Kafka Compose service**
+- [x] **Step 2 — Learner: add the Kafka Compose service**
 
   Add this service before `migrations` in `compose.yaml`:
 
@@ -115,24 +86,23 @@
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 10s
   ```
 
-  Prefix both existing `migrations` and `api` shell commands with
-  `KAFKA_BOOTSTRAP_SERVERS=kafka:19092`, because both construct `Settings`.
-  Do not make `api` depend on Kafka: the API must remain independent of broker
-  availability.
+  Do not add Kafka configuration to the HTTP application's `Settings`,
+  `.env.example`, `api`, or `migrations`. The future relay receives it through
+  its own `RelaySettings` and Compose service.
 
-- [ ] **Step 5 — Codex: verify the bounded infrastructure change**
+- [x] **Step 3 — Codex: verify the bounded infrastructure change**
 
   Run:
 
   ```bash
-  poetry run pytest tests/test_config.py -q
+  poetry run pytest -q
   poetry run ruff check .
   poetry run ruff format --check .
   docker compose config --quiet
@@ -140,15 +110,13 @@
   docker compose ps kafka
   ```
 
-  Expected: settings test and Ruff pass; Compose validates; Kafka reaches
-  `healthy`.
+  Expected: tests and Ruff pass; Compose validates; Kafka reaches `healthy`.
 
-- [ ] **Step 6 — Codex: commit the complete task**
+- [x] **Step 4 — Learner: commit the complete task**
 
   ```bash
-  git add pyproject.toml poetry.lock .env.example compose.yaml \
-    src/schedule_service/config.py tests/test_config.py
-  git commit -m "feat: add local Kafka broker configuration"
+  git add pyproject.toml poetry.lock compose.yaml
+  git commit -m "chore: add local Kafka broker"
   ```
 
 ### Task 2: Extend the outbox repository with pending-event operations
@@ -359,11 +327,13 @@
 **Files:**
 - Create: `src/schedule_service/infrastructure/kafka_event_publisher.py`
 - Create: `src/schedule_service/workers/__init__.py`
+- Create: `src/schedule_service/workers/config.py`
 - Create: `src/schedule_service/workers/outbox_relay.py`
 - Create: `tests/test_kafka_event_publisher.py`
+- Create: `tests/test_relay_config.py`
 
 **Interfaces:**
-- Consumes `EventPublisher`, `PendingOutboxEvent`, `Settings`,
+- Consumes `EventPublisher`, `PendingOutboxEvent`, `RelaySettings`,
   `create_engine()`, `create_session_factory()`, and `SqlAlchemyUnitOfWork`.
 - Produces:
 
@@ -425,7 +395,19 @@
 
 - [ ] **Step 4 — Learner: implement the worker composition root**
 
-  `run()` creates one engine and one session factory, then uses:
+  Codex first adds a focused RED test for `RelaySettings`, setting
+  `KAFKA_BOOTSTRAP_SERVERS` through `monkeypatch` and asserting it is loaded.
+
+  Define worker-only settings in `workers/config.py`:
+
+  ```python
+  class RelaySettings(BaseSettings):
+      model_config = SettingsConfigDict(env_file=".env")
+      database_url: str
+      kafka_bootstrap_servers: str
+  ```
+
+  `run()` creates `RelaySettings()`, one engine and one session factory, then uses:
 
   ```python
   producer = AIOKafkaProducer(
@@ -469,7 +451,6 @@
 
 **Files:**
 - Modify: `compose.yaml`
-- Modify: `tests/test_config.py` only if Task 1 exposed a missing process-specific setting
 
 **Interfaces:**
 - Consumes the worker module from Task 4 and Kafka service from Task 1.

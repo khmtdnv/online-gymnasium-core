@@ -100,12 +100,17 @@ Kafka network I/O.
 
 ## Configuration and Compose
 
-- Add required `KAFKA_BOOTSTRAP_SERVERS` to `Settings` and `.env.example`.
 - Add the `aiokafka` main dependency, pinned in `poetry.lock`.
 - Add one `kafka` Compose service using `apache/kafka:4.3.1` and a healthcheck.
 - Add an `outbox-relay` Compose service built from the existing Dockerfile.
+- Keep the HTTP application's `Settings` unchanged. The relay owns a separate
+  `RelaySettings` object with its PostgreSQL URL and
+  `KAFKA_BOOTSTRAP_SERVERS`; Compose supplies the latter only to the relay
+  process as `kafka:19092`.
 - `outbox-relay` depends on successful migrations and a healthy Kafka broker.
-- Keep PostgreSQL, API, migrations, and RabbitMQ-related configuration unchanged.
+- Keep PostgreSQL, API, migrations, and RabbitMQ-related configuration
+  unchanged. In particular, neither API nor migrations receives a Kafka
+  environment variable.
 
 ## Verification
 
