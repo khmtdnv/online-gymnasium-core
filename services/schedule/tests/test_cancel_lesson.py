@@ -1,9 +1,18 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Self
 
 import pytest
 
+from schedule_service.domain.events import ScheduleChanged
 from schedule_service.domain.lesson import Lesson
+
+
+class FakeOutboxRepository:
+    def __init__(self) -> None:
+        self.events: list[object] = []
+
+    async def add(self, event: object) -> None:
+        self.events.append(event)
 
 
 class FakeLessonRepository:
@@ -53,6 +62,7 @@ class FakeLessonRepository:
 class FakeUnitOfWork:
     def __init__(self) -> None:
         self.lessons = FakeLessonRepository()
+        self.outbox = FakeOutboxRepository()
 
     async def __aenter__(self) -> Self:
         return self
@@ -80,6 +90,13 @@ async def test_handler_cancels_planned_lesson() -> None:
     assert result.version == 4
     assert fake_uow.lessons.saved.status == "canceled"
     assert fake_uow.lessons.saved.version == 4
+    assert fake_uow.outbox.events == [
+        ScheduleChanged(
+            lesson_id=501,
+            class_id=10,
+            affected_dates=(date(2026, 9, 10),),
+        )
+    ]
 
 
 @pytest.mark.anyio

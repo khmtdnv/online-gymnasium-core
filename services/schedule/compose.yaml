@@ -88,6 +88,25 @@ services:
       kafka:
         condition: service_healthy
 
+  cache-invalidator:
+    build:
+      context: .
+    env_file:
+      - .env
+    command:
+      - /bin/sh
+      - -c
+      - >
+        KAFKA_BOOTSTRAP_SERVERS="kafka:19092"
+        REDIS_URL="redis://redis:6379/0"
+        exec poetry run python -m schedule_service.workers.cache_invalidator
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   api:
     build:
       context: .

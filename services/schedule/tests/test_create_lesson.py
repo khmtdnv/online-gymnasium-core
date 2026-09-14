@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Self
 
 import pytest
 
+from schedule_service.domain.events import ScheduleChanged
 from schedule_service.domain.lesson import Lesson
 
 
@@ -130,16 +131,21 @@ async def test_handler_queues_lesson_created_event_after_creating_lesson() -> No
 
     await handler.handle(command)
 
-    assert len(fake_uow.outbox.events) == 1
-    event = fake_uow.outbox.events[0]
-    assert event.lesson_id == 501
-    assert event.class_id == 10
-    assert event.teacher_id == 100
-    assert event.subject_id == 1000
-    assert event.starts_at == command.starts_at
-    assert event.ends_at == command.ends_at
-    assert event.status == "planned"
-    assert event.version == 1
+    assert len(fake_uow.outbox.events) == 2
+    lesson_created, schedule_changed = fake_uow.outbox.events
+    assert lesson_created.lesson_id == 501
+    assert lesson_created.class_id == 10
+    assert lesson_created.teacher_id == 100
+    assert lesson_created.subject_id == 1000
+    assert lesson_created.starts_at == command.starts_at
+    assert lesson_created.ends_at == command.ends_at
+    assert lesson_created.status == "planned"
+    assert lesson_created.version == 1
+    assert schedule_changed == ScheduleChanged(
+        lesson_id=501,
+        class_id=10,
+        affected_dates=(date(2026, 9, 13),),
+    )
 
 
 @pytest.mark.anyio
@@ -176,7 +182,7 @@ async def test_same_requests_are_idempotent() -> None:
     second_cmd_result = await handler.handle(second_command)
 
     assert fake_uow.lessons.add_calls == 1
-    assert len(fake_uow.outbox.events) == 1
+    assert len(fake_uow.outbox.events) == 2
 
     assert first_cmd_result == second_cmd_result
 

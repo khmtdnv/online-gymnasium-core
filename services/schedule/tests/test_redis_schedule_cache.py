@@ -83,3 +83,29 @@ async def test_cache_stores_lessons_as_json_with_requested_ttl() -> None:
             "version": 1,
         }
     ]
+
+
+@pytest.mark.anyio
+async def test_cache_invalidates_requested_class_schedule_days() -> None:
+    client = AsyncMock()
+    cache = RedisScheduleCache(client)
+
+    await cache.invalidate(
+        class_id=10,
+        days=(date(2026, 9, 10), date(2026, 9, 11)),
+    )
+
+    client.delete.assert_awaited_once_with(
+        "schedule:class:10:date:2026-09-10",
+        "schedule:class:10:date:2026-09-11",
+    )
+
+
+@pytest.mark.anyio
+async def test_cache_skips_redis_delete_when_no_days_need_invalidation() -> None:
+    client = AsyncMock()
+    cache = RedisScheduleCache(client)
+
+    await cache.invalidate(class_id=10, days=())
+
+    client.delete.assert_not_called()

@@ -2,7 +2,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from schedule_service.application.ports.outbox_repository import PendingOutboxEvent
-from schedule_service.domain.events import LessonCreated
+from schedule_service.domain.events import LessonCreated, ScheduleChanged
 from schedule_service.infrastructure.models.outbox_event import OutboxEventRow
 
 
@@ -10,20 +10,33 @@ class SqlAlchemyOutboxRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def add(self, event: LessonCreated) -> None:
-        row = OutboxEventRow(
-            event_type="lesson.created",
-            payload={
-                "lesson_id": event.lesson_id,
-                "class_id": event.class_id,
-                "teacher_id": event.teacher_id,
-                "subject_id": event.subject_id,
-                "starts_at": event.starts_at.isoformat(),
-                "ends_at": event.ends_at.isoformat(),
-                "status": event.status,
-                "version": event.version,
-            },
-        )
+    async def add(self, event: LessonCreated | ScheduleChanged) -> None:
+        if isinstance(event, LessonCreated):
+            row = OutboxEventRow(
+                event_type="lesson.created",
+                payload={
+                    "lesson_id": event.lesson_id,
+                    "class_id": event.class_id,
+                    "teacher_id": event.teacher_id,
+                    "subject_id": event.subject_id,
+                    "starts_at": event.starts_at.isoformat(),
+                    "ends_at": event.ends_at.isoformat(),
+                    "status": event.status,
+                    "version": event.version,
+                },
+            )
+        elif isinstance(event, ScheduleChanged):
+            row = OutboxEventRow(
+                event_type="schedule.changed",
+                payload={
+                    "lesson_id": event.lesson_id,
+                    "class_id": event.class_id,
+                    "affected_dates": [day.isoformat() for day in event.affected_dates],
+                },
+            )
+        else:
+            raise TypeError(f"Unsupported outbox event: {type(event).__name__}")
+
         self._session.add(row)
 
     async def get_pending(self, *, limit: int) -> list[PendingOutboxEvent]:

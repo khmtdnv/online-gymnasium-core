@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from schedule_service.application.errors import LessonNotFound, VersionConflict
 from schedule_service.application.ports.unit_of_work import UnitOfWorkFactory
+from schedule_service.domain.events import ScheduleChanged
 from schedule_service.domain.lesson import Lesson
 
 
@@ -29,5 +30,14 @@ class CancelLessonHandler:
             )
             if canceled_lesson is None:
                 raise VersionConflict
+
+            assert canceled_lesson.id is not None
+            await uow.outbox.add(
+                ScheduleChanged(
+                    lesson_id=canceled_lesson.id,
+                    class_id=canceled_lesson.class_id,
+                    affected_dates=(canceled_lesson.starts_at.date(),),
+                )
+            )
 
             return canceled_lesson

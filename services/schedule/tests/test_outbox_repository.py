@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -43,6 +43,36 @@ async def test_repository_adds_json_snapshot_of_lesson_created_event_to_session(
         "ends_at": "2026-09-13T11:00:00+00:00",
         "status": "planned",
         "version": 1,
+    }
+    session.add.assert_called_once_with(row)
+
+
+@pytest.mark.anyio
+async def test_repository_adds_schedule_changed_event_to_session() -> None:
+    from schedule_service.domain.events import ScheduleChanged
+    from schedule_service.infrastructure.models.outbox_event import OutboxEventRow
+    from schedule_service.infrastructure.outbox_repository import (
+        SqlAlchemyOutboxRepository,
+    )
+
+    session = AsyncMock(spec=AsyncSession)
+    repository = SqlAlchemyOutboxRepository(session)
+
+    await repository.add(
+        ScheduleChanged(
+            lesson_id=501,
+            class_id=10,
+            affected_dates=(date(2026, 9, 10), date(2026, 9, 11)),
+        )
+    )
+
+    row = session.add.call_args.args[0]
+    assert isinstance(row, OutboxEventRow)
+    assert row.event_type == "schedule.changed"
+    assert row.payload == {
+        "lesson_id": 501,
+        "class_id": 10,
+        "affected_dates": ["2026-09-10", "2026-09-11"],
     }
     session.add.assert_called_once_with(row)
 

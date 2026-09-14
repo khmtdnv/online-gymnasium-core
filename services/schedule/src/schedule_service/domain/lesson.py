@@ -26,6 +26,11 @@ class Lesson:
     version: int = 1
 
     @staticmethod
+    def _validate_interval(starts_at: datetime, ends_at: datetime) -> None:
+        if starts_at >= ends_at or starts_at.date() != ends_at.date():
+            raise InvalidLessonInterval
+
+    @staticmethod
     def create(
         class_id: int,
         teacher_id: int,
@@ -33,8 +38,7 @@ class Lesson:
         starts_at: datetime,
         ends_at: datetime,
     ) -> Lesson:
-        if starts_at >= ends_at:
-            raise InvalidLessonInterval
+        Lesson._validate_interval(starts_at, ends_at)
 
         return Lesson(
             class_id=class_id,
@@ -45,8 +49,7 @@ class Lesson:
         )
 
     def reschedule(self, starts_at: datetime, ends_at: datetime) -> None:
-        if starts_at >= ends_at:
-            raise InvalidLessonInterval
+        Lesson._validate_interval(starts_at, ends_at)
 
         self.starts_at = starts_at
         self.ends_at = ends_at

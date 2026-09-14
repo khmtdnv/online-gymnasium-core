@@ -6,3 +6,10 @@ class RelaySettings(BaseSettings):
 
     database_url: str
     kafka_bootstrap_servers: str
+
+
+class InvalidatorSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    kafka_bootstrap_servers: str
+    redis_url: str

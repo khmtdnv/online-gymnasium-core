@@ -3,7 +3,7 @@ from datetime import datetime
 
 from schedule_service.application.errors import IdempotencyKeyReuse
 from schedule_service.application.ports.unit_of_work import UnitOfWorkFactory
-from schedule_service.domain.events import LessonCreated
+from schedule_service.domain.events import LessonCreated, ScheduleChanged
 from schedule_service.domain.lesson import Lesson
 
 
@@ -49,17 +49,26 @@ class CreateLessonHandler:
             db_lesson = await uow.lessons.add(lesson)
 
             assert db_lesson.id is not None
-            lesson_created = LessonCreated(
-                lesson_id=db_lesson.id,
-                class_id=db_lesson.class_id,
-                teacher_id=db_lesson.teacher_id,
-                subject_id=db_lesson.subject_id,
-                starts_at=db_lesson.starts_at,
-                ends_at=db_lesson.ends_at,
-                status=db_lesson.status,
-                version=db_lesson.version,
+
+            await uow.outbox.add(
+                LessonCreated(
+                    lesson_id=db_lesson.id,
+                    class_id=db_lesson.class_id,
+                    teacher_id=db_lesson.teacher_id,
+                    subject_id=db_lesson.subject_id,
+                    starts_at=db_lesson.starts_at,
+                    ends_at=db_lesson.ends_at,
+                    status=db_lesson.status,
+                    version=db_lesson.version,
+                )
             )
-            await uow.outbox.add(lesson_created)
+            await uow.outbox.add(
+                ScheduleChanged(
+                    lesson_id=db_lesson.id,
+                    class_id=db_lesson.class_id,
+                    affected_dates=(db_lesson.starts_at.date(),),
+                )
+            )
 
             if command.idempotency_key is not None:
                 assert command.request_hash is not None

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Self
 
 import pytest
@@ -7,7 +7,16 @@ from schedule_service.application.update_lesson import (
     UpdateLessonCommand,
     UpdateLessonHandler,
 )
+from schedule_service.domain.events import ScheduleChanged
 from schedule_service.domain.lesson import Lesson
+
+
+class FakeOutboxRepository:
+    def __init__(self) -> None:
+        self.events: list[object] = []
+
+    async def add(self, event: object) -> None:
+        self.events.append(event)
 
 
 class FakeLessonRepository:
@@ -61,6 +70,7 @@ class FakeLessonRepository:
 class FakeUnitOfWork:
     def __init__(self) -> None:
         self.lessons = FakeLessonRepository()
+        self.outbox = FakeOutboxRepository()
 
     async def __aenter__(self) -> Self:
         return self
@@ -96,6 +106,36 @@ async def test_handler_reschedules_lesson_through_uow() -> None:
     assert lesson_sent_to_update.class_id == 10
     assert lesson_sent_to_update.teacher_id == 100
     assert lesson_sent_to_update.subject_id == 1000
+    assert fake_uow.outbox.events == [
+        ScheduleChanged(
+            lesson_id=501,
+            class_id=10,
+            affected_dates=(date(2026, 9, 10),),
+        )
+    ]
+
+
+@pytest.mark.anyio
+async def test_handler_invalidates_old_and_new_days_when_lesson_moves_day() -> None:
+    fake_uow = FakeUnitOfWork()
+    handler = UpdateLessonHandler(uow_factory=lambda: fake_uow)
+
+    await handler.handle(
+        UpdateLessonCommand(
+            lesson_id=501,
+            starts_at=datetime(2026, 9, 11, 12, tzinfo=UTC),
+            ends_at=datetime(2026, 9, 11, 13, tzinfo=UTC),
+            expected_version=3,
+        )
+    )
+
+    assert fake_uow.outbox.events == [
+        ScheduleChanged(
+            lesson_id=501,
+            class_id=10,
+            affected_dates=(date(2026, 9, 10), date(2026, 9, 11)),
+        )
+    ]
 
 
 @pytest.mark.anyio

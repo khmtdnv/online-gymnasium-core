@@ -47,6 +47,33 @@ def test_equal_timerange_raises_domain_error() -> None:
         )
 
 
+def test_create_rejects_lesson_crossing_midnight() -> None:
+    with pytest.raises(InvalidLessonInterval):
+        Lesson.create(
+            class_id=10,
+            teacher_id=100,
+            subject_id=1000,
+            starts_at=datetime(2026, 9, 10, 23, tzinfo=UTC),
+            ends_at=datetime(2026, 9, 11, 1, tzinfo=UTC),
+        )
+
+
+def test_reschedule_rejects_lesson_crossing_midnight() -> None:
+    lesson = Lesson.create(
+        class_id=10,
+        teacher_id=100,
+        subject_id=1000,
+        starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+    )
+
+    with pytest.raises(InvalidLessonInterval):
+        lesson.reschedule(
+            starts_at=datetime(2026, 9, 10, 23, tzinfo=UTC),
+            ends_at=datetime(2026, 9, 11, 1, tzinfo=UTC),
+        )
+
+
 def test_reschedule_changes_interval_and_preserves_other_lesson_data() -> None:
     lesson = Lesson(
         id=501,

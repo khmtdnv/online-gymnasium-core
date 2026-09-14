@@ -68,5 +68,17 @@ class RedisScheduleCache:
             ex=ttl_seconds,
         )
 
+    async def invalidate(
+        self,
+        *,
+        class_id: int,
+        days: tuple[date, ...],
+    ) -> None:
+        if not days:
+            return
+
+        keys = [self._key(class_id=class_id, day=day) for day in days]
+        await self._client.delete(*keys)
+
     async def aclose(self) -> None:
         await self._client.aclose()

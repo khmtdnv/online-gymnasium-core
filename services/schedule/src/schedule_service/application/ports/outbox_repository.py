@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from schedule_service.domain.events import LessonCreated
+from schedule_service.domain.events import LessonCreated, ScheduleChanged
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,6 +14,6 @@ class PendingOutboxEvent:
 
 
 class OutboxRepository(Protocol):
-    async def add(self, event: LessonCreated) -> None: ...
+    async def add(self, event: LessonCreated | ScheduleChanged) -> None: ...
     async def get_pending(self, *, limit: int) -> list[PendingOutboxEvent]: ...
     async def mark_published(self, *, event_id: int) -> None: ...
