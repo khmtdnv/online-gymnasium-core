@@ -16,3 +16,7 @@ class VersionConflict(ApplicationException):
 
 class IdempotencyKeyReuse(ApplicationException):
     pass
+
+
+class ScheduleCacheBusy(ApplicationException):
+    pass

@@ -147,9 +147,7 @@ async def test_repository_lists_planned_lessons_for_class_and_day_in_start_order
     ]
     repository = SqlAlchemyLessonRepository(session)
 
-    lessons = await repository.list_planned_for_class_on_day(
-        class_id=10, day=date(2026, 9, 10)
-    )
+    lessons = await repository.get_class_schedule(class_id=10, day=date(2026, 9, 10))
 
     assert [lesson.id for lesson in lessons] == [502, 501]
     assert [lesson.status for lesson in lessons] == ["planned", "planned"]

@@ -19,7 +19,15 @@ def get_update_lesson_handler(request: Request) -> UpdateLessonHandler:
 
 
 def get_list_lessons_handler(request: Request) -> ListLessonsHandler:
+    settings = request.app.state.settings
+
     return ListLessonsHandler(
         uow_factory=request.app.state.uow_factory,
         cache=request.app.state.schedule_cache,
+        schedule_cache_ttl_seconds=settings.schedule_cache_ttl_seconds,
+        schedule_cache_lock_ttl_ms=settings.schedule_cache_lock_ttl_ms,
+        schedule_cache_lock_retry_delay_ms=(
+            settings.schedule_cache_lock_retry_delay_ms
+        ),
+        schedule_cache_lock_retry_limit=settings.schedule_cache_lock_retry_limit,
     )

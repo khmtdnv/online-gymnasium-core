@@ -26,6 +26,7 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
     app.include_router(router)
+    app.state.settings = settings
     app.state.engine = engine
     app.state.uow_factory = uow_factory
     app.state.schedule_cache = schedule_cache

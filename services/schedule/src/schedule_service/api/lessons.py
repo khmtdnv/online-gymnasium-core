@@ -24,6 +24,7 @@ from schedule_service.application.create_lesson import (
 from schedule_service.application.errors import (
     IdempotencyKeyReuse,
     LessonNotFound,
+    ScheduleCacheBusy,
     ScheduleConflict,
     VersionConflict,
 )
@@ -179,5 +180,11 @@ async def list_lessons(
     date: Date,
     handler: Annotated[ListLessonsHandler, Depends(get_list_lessons_handler)],
 ):
-    query = ListLessonsQuery(class_id=class_id, day=date)
-    return await handler.handle(query)
+    try:
+        query = ListLessonsQuery(class_id=class_id, day=date)
+        return await handler.handle(query)
+    except ScheduleCacheBusy as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Schedule cache is busy",
+        ) from exc
