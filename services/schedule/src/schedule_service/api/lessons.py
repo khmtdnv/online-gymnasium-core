@@ -1,5 +1,6 @@
 import hashlib
 import json
+from datetime import date as Date
 from datetime import datetime
 from typing import Annotated
 
@@ -9,11 +10,13 @@ from pydantic import BaseModel
 from schedule_service.api.dependencies import (
     get_cancel_lesson_handler,
     get_create_lesson_handler,
+    get_list_lessons_handler,
     get_update_lesson_handler,
 )
 from schedule_service.application.cancel_lesson import CancelLessonCommand, CancelLessonHandler
 from schedule_service.application.create_lesson import CreateLessonCommand, CreateLessonHandler
 from schedule_service.application.errors import IdempotencyKeyReuse, LessonNotFound, ScheduleConflict, VersionConflict
+from schedule_service.application.list_lessons import ListLessonsHandler, ListLessonsQuery
 from schedule_service.application.update_lesson import UpdateLessonCommand, UpdateLessonHandler
 from schedule_service.domain.lesson import InvalidLessonInterval, LessonAlreadyCanceled
 
@@ -151,3 +154,13 @@ async def cancel_lesson(
             status_code=status.HTTP_409_CONFLICT,
             detail="Lesson version conflict",
         ) from exc
+
+
+@router.get("", response_model=list[LessonResponse])
+async def list_lessons(
+    class_id: int,
+    date: Date,
+    handler: Annotated[ListLessonsHandler, Depends(get_list_lessons_handler)],
+):
+    query = ListLessonsQuery(class_id=class_id, day=date)
+    return await handler.handle(query)

@@ -1,3 +1,5 @@
+from datetime import UTC, date, datetime, time, timedelta
+
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -126,3 +128,36 @@ class SqlAlchemyLessonRepository:
             status=row.status,
             version=row.version,
         )
+
+    async def list_planned_for_class_on_day(self, *, class_id: int, day: date) -> list[Lesson]:
+        day_start = datetime.combine(day, time.min, tzinfo=UTC)
+        day_end = day_start + timedelta(days=1)
+
+        statement = (
+            select(ScheduledLessonRow)
+            .where(
+                ScheduledLessonRow.class_id == class_id,
+                ScheduledLessonRow.status == "planned",
+                ScheduledLessonRow.starts_at < day_end,
+                ScheduledLessonRow.ends_at > day_start,
+            )
+            .order_by(ScheduledLessonRow.starts_at)
+        )
+        orm_lessons = (await self._session.scalars(statement)).all()
+
+        domain_lessons = []
+        for lesson in orm_lessons:
+            domain_lessons.append(
+                Lesson(
+                    id=lesson.id,
+                    class_id=lesson.class_id,
+                    teacher_id=lesson.teacher_id,
+                    subject_id=lesson.subject_id,
+                    starts_at=lesson.starts_at,
+                    ends_at=lesson.ends_at,
+                    status=lesson.status,
+                    version=lesson.version,
+                )
+            )
+
+        return domain_lessons

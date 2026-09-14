@@ -1,7 +1,8 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -113,6 +114,48 @@ async def test_repository_get_maps_existing_row_to_domain_lesson() -> None:
         status="planned",
         version=3,
     )
+
+
+@pytest.mark.anyio
+async def test_repository_lists_planned_lessons_for_class_and_day_in_start_order() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    scalar_result = Mock()
+    session.scalars.return_value = scalar_result
+    scalar_result.all.return_value = [
+        ScheduledLessonRow(
+            id=502,
+            class_id=10,
+            teacher_id=101,
+            subject_id=1001,
+            starts_at=datetime(2026, 9, 10, 8, tzinfo=UTC),
+            ends_at=datetime(2026, 9, 10, 9, tzinfo=UTC),
+            status="planned",
+            version=1,
+        ),
+        ScheduledLessonRow(
+            id=501,
+            class_id=10,
+            teacher_id=100,
+            subject_id=1000,
+            starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+            ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+            status="planned",
+            version=1,
+        ),
+    ]
+    repository = SqlAlchemyLessonRepository(session)
+
+    lessons = await repository.list_planned_for_class_on_day(class_id=10, day=date(2026, 9, 10))
+
+    assert [lesson.id for lesson in lessons] == [502, 501]
+    assert [lesson.status for lesson in lessons] == ["planned", "planned"]
+    statement = session.scalars.await_args.args[0]
+    sql = str(statement.compile(dialect=postgresql.dialect()))
+    assert "scheduled_lessons.class_id" in sql
+    assert "scheduled_lessons.status" in sql
+    assert "scheduled_lessons.starts_at <" in sql
+    assert "scheduled_lessons.ends_at >" in sql
+    assert "ORDER BY scheduled_lessons.starts_at" in sql
 
 
 @pytest.mark.anyio

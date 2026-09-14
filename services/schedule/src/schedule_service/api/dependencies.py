@@ -2,6 +2,7 @@ from fastapi import Request
 
 from schedule_service.application.cancel_lesson import CancelLessonHandler
 from schedule_service.application.create_lesson import CreateLessonHandler
+from schedule_service.application.list_lessons import ListLessonsHandler
 from schedule_service.application.update_lesson import UpdateLessonHandler
 
 
@@ -15,3 +16,7 @@ def get_cancel_lesson_handler(request: Request) -> CancelLessonHandler:
 
 def get_update_lesson_handler(request: Request) -> UpdateLessonHandler:
     return UpdateLessonHandler(uow_factory=request.app.state.uow_factory)
+
+
+def get_list_lessons_handler(request: Request) -> ListLessonsHandler:
+    return ListLessonsHandler(uow_factory=request.app.state.uow_factory)
