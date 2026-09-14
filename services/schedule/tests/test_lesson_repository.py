@@ -117,7 +117,9 @@ async def test_repository_get_maps_existing_row_to_domain_lesson() -> None:
 
 
 @pytest.mark.anyio
-async def test_repository_lists_planned_lessons_for_class_and_day_in_start_order() -> None:
+async def test_repository_lists_planned_lessons_for_class_and_day_in_start_order() -> (
+    None
+):
     session = AsyncMock(spec=AsyncSession)
     scalar_result = Mock()
     session.scalars.return_value = scalar_result
@@ -145,7 +147,9 @@ async def test_repository_lists_planned_lessons_for_class_and_day_in_start_order
     ]
     repository = SqlAlchemyLessonRepository(session)
 
-    lessons = await repository.list_planned_for_class_on_day(class_id=10, day=date(2026, 9, 10))
+    lessons = await repository.list_planned_for_class_on_day(
+        class_id=10, day=date(2026, 9, 10)
+    )
 
     assert [lesson.id for lesson in lessons] == [502, 501]
     assert [lesson.status for lesson in lessons] == ["planned", "planned"]
@@ -229,7 +233,9 @@ async def test_repository_update_returns_none_when_version_does_not_match() -> N
 
 
 @pytest.mark.anyio
-async def test_repository_translates_update_integrity_error_to_schedule_conflict() -> None:
+async def test_repository_translates_update_integrity_error_to_schedule_conflict() -> (
+    None
+):
     session = AsyncMock(spec=AsyncSession)
     database_error = IntegrityError(
         "UPDATE scheduled_lessons ...",

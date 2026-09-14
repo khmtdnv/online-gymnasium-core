@@ -24,7 +24,9 @@ class CancelLessonHandler:
 
             lesson.cancel()
 
-            canceled_lesson = await uow.lessons.cancel(lesson=lesson, expected_version=command.expected_version)
+            canceled_lesson = await uow.lessons.cancel(
+                lesson=lesson, expected_version=command.expected_version
+            )
             if canceled_lesson is None:
                 raise VersionConflict
 

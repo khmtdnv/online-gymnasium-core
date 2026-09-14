@@ -3,7 +3,12 @@ from schedule_service.application.ports.unit_of_work import UnitOfWorkFactory
 
 
 class OutboxRelay:
-    def __init__(self, uow_factory: UnitOfWorkFactory, publisher: EventPublisher, batch_size: int = 100) -> None:
+    def __init__(
+        self,
+        uow_factory: UnitOfWorkFactory,
+        publisher: EventPublisher,
+        batch_size: int = 100,
+    ) -> None:
         self._uow_factory = uow_factory
         self._publisher = publisher
         self._batch_size = batch_size

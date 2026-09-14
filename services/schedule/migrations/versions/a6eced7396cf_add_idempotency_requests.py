@@ -33,7 +33,11 @@ def upgrade() -> None:
             ["scheduled_lessons.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("operation", "idempotency_key", name="idempotency_requests_operation_key_unique"),
+        sa.UniqueConstraint(
+            "operation",
+            "idempotency_key",
+            name="idempotency_requests_operation_key_unique",
+        ),
     )
     # ### end Alembic commands ###
 

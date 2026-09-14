@@ -71,7 +71,9 @@ async def test_handler_cancels_planned_lesson() -> None:
     fake_uow = FakeUnitOfWork()
     handler = CancelLessonHandler(uow_factory=lambda: fake_uow)
 
-    result = await handler.handle(CancelLessonCommand(lesson_id=501, expected_version=3))
+    result = await handler.handle(
+        CancelLessonCommand(lesson_id=501, expected_version=3)
+    )
 
     assert result.id == 501
     assert result.status == "canceled"
@@ -82,7 +84,10 @@ async def test_handler_cancels_planned_lesson() -> None:
 
 @pytest.mark.anyio
 async def test_handler_raises_not_found_for_absent_lesson() -> None:
-    from schedule_service.application.cancel_lesson import CancelLessonCommand, CancelLessonHandler
+    from schedule_service.application.cancel_lesson import (
+        CancelLessonCommand,
+        CancelLessonHandler,
+    )
     from schedule_service.application.errors import LessonNotFound
 
     fake_uow = FakeUnitOfWork()
@@ -94,7 +99,10 @@ async def test_handler_raises_not_found_for_absent_lesson() -> None:
 
 @pytest.mark.anyio
 async def test_handler_raises_version_conflict_for_stale_version() -> None:
-    from schedule_service.application.cancel_lesson import CancelLessonCommand, CancelLessonHandler
+    from schedule_service.application.cancel_lesson import (
+        CancelLessonCommand,
+        CancelLessonHandler,
+    )
     from schedule_service.application.errors import VersionConflict
 
     fake_uow = FakeUnitOfWork()

@@ -6,8 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from schedule_service.application.ports.idempotency_repository import IdempotencyRecord
 from schedule_service.domain.lesson import Lesson
-from schedule_service.infrastructure.idempotency_repository import SqlAlchemyIdempotencyRepository
-from schedule_service.infrastructure.models.idempotency_request import IdempotencyRequestRow
+from schedule_service.infrastructure.idempotency_repository import (
+    SqlAlchemyIdempotencyRepository,
+)
+from schedule_service.infrastructure.models.idempotency_request import (
+    IdempotencyRequestRow,
+)
 from schedule_service.infrastructure.models.scheduled_lesson import ScheduledLessonRow
 
 

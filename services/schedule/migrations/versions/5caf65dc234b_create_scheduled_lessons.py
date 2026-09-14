@@ -32,7 +32,9 @@ def upgrade() -> None:
         sa.Column("subject_id", sa.Integer(), nullable=False),
         sa.Column("starts_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("ends_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("status", sa.String(length=20), server_default="planned", nullable=False),
+        sa.Column(
+            "status", sa.String(length=20), server_default="planned", nullable=False
+        ),
         sa.Column("version", sa.Integer(), server_default="1", nullable=False),
         postgresql.ExcludeConstraint(
             (sa.column("class_id"), "="),
@@ -48,7 +50,9 @@ def upgrade() -> None:
             using="gist",
             name="scheduled_lessons_no_teacher_overlap",
         ),
-        sa.CheckConstraint("starts_at < ends_at", name="scheduled_lessons_valid_interval"),
+        sa.CheckConstraint(
+            "starts_at < ends_at", name="scheduled_lessons_valid_interval"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     # ### end Alembic commands ###

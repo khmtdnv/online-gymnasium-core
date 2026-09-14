@@ -28,7 +28,10 @@ class SqlAlchemyOutboxRepository:
 
     async def get_pending(self, *, limit: int) -> list[PendingOutboxEvent]:
         statement = (
-            select(OutboxEventRow).where(OutboxEventRow.published_at.is_(None)).order_by(OutboxEventRow.id).limit(limit)
+            select(OutboxEventRow)
+            .where(OutboxEventRow.published_at.is_(None))
+            .order_by(OutboxEventRow.id)
+            .limit(limit)
         )
 
         rows = (await self._session.scalars(statement)).all()

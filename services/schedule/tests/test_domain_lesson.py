@@ -2,7 +2,11 @@ from datetime import UTC, datetime
 
 import pytest
 
-from schedule_service.domain.lesson import InvalidLessonInterval, Lesson, LessonAlreadyCanceled
+from schedule_service.domain.lesson import (
+    InvalidLessonInterval,
+    Lesson,
+    LessonAlreadyCanceled,
+)
 
 
 def test_valid_data_created_valid_domain_object() -> None:

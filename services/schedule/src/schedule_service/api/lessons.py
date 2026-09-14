@@ -13,11 +13,28 @@ from schedule_service.api.dependencies import (
     get_list_lessons_handler,
     get_update_lesson_handler,
 )
-from schedule_service.application.cancel_lesson import CancelLessonCommand, CancelLessonHandler
-from schedule_service.application.create_lesson import CreateLessonCommand, CreateLessonHandler
-from schedule_service.application.errors import IdempotencyKeyReuse, LessonNotFound, ScheduleConflict, VersionConflict
-from schedule_service.application.list_lessons import ListLessonsHandler, ListLessonsQuery
-from schedule_service.application.update_lesson import UpdateLessonCommand, UpdateLessonHandler
+from schedule_service.application.cancel_lesson import (
+    CancelLessonCommand,
+    CancelLessonHandler,
+)
+from schedule_service.application.create_lesson import (
+    CreateLessonCommand,
+    CreateLessonHandler,
+)
+from schedule_service.application.errors import (
+    IdempotencyKeyReuse,
+    LessonNotFound,
+    ScheduleConflict,
+    VersionConflict,
+)
+from schedule_service.application.list_lessons import (
+    ListLessonsHandler,
+    ListLessonsQuery,
+)
+from schedule_service.application.update_lesson import (
+    UpdateLessonCommand,
+    UpdateLessonHandler,
+)
 from schedule_service.domain.lesson import InvalidLessonInterval, LessonAlreadyCanceled
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])

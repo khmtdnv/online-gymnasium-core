@@ -9,7 +9,9 @@ from schedule_service.application.ports.outbox_repository import PendingOutboxEv
 
 @pytest.mark.anyio
 async def test_kafka_publisher_sends_documented_json_envelope_with_lesson_key() -> None:
-    from schedule_service.infrastructure.kafka_event_publisher import KafkaEventPublisher
+    from schedule_service.infrastructure.kafka_event_publisher import (
+        KafkaEventPublisher,
+    )
 
     producer = AsyncMock(spec=AIOKafkaProducer)
     publisher = KafkaEventPublisher(producer=producer, topic="schedule.lessons")

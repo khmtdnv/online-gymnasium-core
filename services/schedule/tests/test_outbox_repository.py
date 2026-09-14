@@ -7,10 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.mark.anyio
-async def test_repository_adds_json_snapshot_of_lesson_created_event_to_session() -> None:
+async def test_repository_adds_json_snapshot_of_lesson_created_event_to_session() -> (
+    None
+):
     from schedule_service.domain.events import LessonCreated
     from schedule_service.infrastructure.models.outbox_event import OutboxEventRow
-    from schedule_service.infrastructure.outbox_repository import SqlAlchemyOutboxRepository
+    from schedule_service.infrastructure.outbox_repository import (
+        SqlAlchemyOutboxRepository,
+    )
 
     session = AsyncMock(spec=AsyncSession)
     repository = SqlAlchemyOutboxRepository(session)
@@ -46,7 +50,9 @@ async def test_repository_adds_json_snapshot_of_lesson_created_event_to_session(
 @pytest.mark.anyio
 async def test_repository_returns_pending_events_in_id_order() -> None:
     from schedule_service.infrastructure.models.outbox_event import OutboxEventRow
-    from schedule_service.infrastructure.outbox_repository import SqlAlchemyOutboxRepository
+    from schedule_service.infrastructure.outbox_repository import (
+        SqlAlchemyOutboxRepository,
+    )
 
     session = AsyncMock(spec=AsyncSession)
     scalar_result = Mock()
@@ -81,7 +87,9 @@ async def test_repository_returns_pending_events_in_id_order() -> None:
 
 @pytest.mark.anyio
 async def test_repository_marks_only_pending_event_as_published() -> None:
-    from schedule_service.infrastructure.outbox_repository import SqlAlchemyOutboxRepository
+    from schedule_service.infrastructure.outbox_repository import (
+        SqlAlchemyOutboxRepository,
+    )
 
     session = AsyncMock(spec=AsyncSession)
     repository = SqlAlchemyOutboxRepository(session)

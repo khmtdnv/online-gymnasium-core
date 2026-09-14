@@ -8,7 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 
 @pytest.mark.anyio
-async def test_worker_starts_and_stops_kafka_and_database_resources(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_worker_starts_and_stops_kafka_and_database_resources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from schedule_service.workers import outbox_relay
 
     producer = AsyncMock(spec=AIOKafkaProducer)

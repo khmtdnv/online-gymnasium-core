@@ -26,7 +26,13 @@ class Lesson:
     version: int = 1
 
     @staticmethod
-    def create(class_id: int, teacher_id: int, subject_id: int, starts_at: datetime, ends_at: datetime) -> Lesson:
+    def create(
+        class_id: int,
+        teacher_id: int,
+        subject_id: int,
+        starts_at: datetime,
+        ends_at: datetime,
+    ) -> Lesson:
         if starts_at >= ends_at:
             raise InvalidLessonInterval
 

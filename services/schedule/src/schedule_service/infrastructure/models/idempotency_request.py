@@ -11,7 +11,9 @@ class IdempotencyRequestRow(Base):
     operation: Mapped[str] = mapped_column(String, nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String, nullable=False)
     request_hash: Mapped[str] = mapped_column(String, nullable=False)
-    lesson_id: Mapped[int | None] = mapped_column(ForeignKey("scheduled_lessons.id"), nullable=True)
+    lesson_id: Mapped[int | None] = mapped_column(
+        ForeignKey("scheduled_lessons.id"), nullable=True
+    )
 
     __table_args__ = (
         UniqueConstraint(

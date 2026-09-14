@@ -19,4 +19,7 @@ def get_update_lesson_handler(request: Request) -> UpdateLessonHandler:
 
 
 def get_list_lessons_handler(request: Request) -> ListLessonsHandler:
-    return ListLessonsHandler(uow_factory=request.app.state.uow_factory)
+    return ListLessonsHandler(
+        uow_factory=request.app.state.uow_factory,
+        cache=request.app.state.schedule_cache,
+    )

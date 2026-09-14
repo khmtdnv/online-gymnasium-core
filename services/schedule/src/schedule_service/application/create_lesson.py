@@ -27,7 +27,9 @@ class CreateLessonHandler:
             if command.idempotency_key is not None:
                 assert command.request_hash is not None
 
-                record = await uow.idempotency.claim("create_lesson", command.idempotency_key, command.request_hash)
+                record = await uow.idempotency.claim(
+                    "create_lesson", command.idempotency_key, command.request_hash
+                )
 
                 if record is not None:
                     if record.request_hash != command.request_hash:
@@ -61,6 +63,8 @@ class CreateLessonHandler:
 
             if command.idempotency_key is not None:
                 assert command.request_hash is not None
-                await uow.idempotency.complete("create_lesson", command.idempotency_key, db_lesson)
+                await uow.idempotency.complete(
+                    "create_lesson", command.idempotency_key, db_lesson
+                )
 
             return db_lesson

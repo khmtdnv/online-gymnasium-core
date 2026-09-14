@@ -14,4 +14,7 @@ def test_settings_object_created_from_env(monkeypatch: MonkeyPatch) -> None:
 
     settings = Settings()
 
-    assert settings.database_url == "postgresql+asyncpg://schedule:password@localhost:5432/schedule"
+    assert (
+        settings.database_url
+        == "postgresql+asyncpg://schedule:password@localhost:5432/schedule"
+    )

@@ -4,7 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from schedule_service.application.ports.idempotency_repository import IdempotencyRecord
 from schedule_service.domain.lesson import Lesson
-from schedule_service.infrastructure.models.idempotency_request import IdempotencyRequestRow
+from schedule_service.infrastructure.models.idempotency_request import (
+    IdempotencyRequestRow,
+)
 from schedule_service.infrastructure.models.scheduled_lesson import ScheduledLessonRow
 
 
@@ -12,7 +14,9 @@ class SqlAlchemyIdempotencyRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def claim(self, operation: str, key: str, request_hash: str) -> IdempotencyRecord | None:
+    async def claim(
+        self, operation: str, key: str, request_hash: str
+    ) -> IdempotencyRecord | None:
         statement = (
             insert(IdempotencyRequestRow)
             .values(
@@ -44,7 +48,9 @@ class SqlAlchemyIdempotencyRepository:
                 lesson=None,
             )
 
-        statement = select(ScheduledLessonRow).where(ScheduledLessonRow.id == existing_record.lesson_id)
+        statement = select(ScheduledLessonRow).where(
+            ScheduledLessonRow.id == existing_record.lesson_id
+        )
         orm_lesson = await self._session.scalar(statement)
         assert orm_lesson is not None
 

@@ -2,13 +2,23 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Self
 
+from conftest import NoopScheduleCache
 from fastapi.testclient import TestClient
 
-from schedule_service.app import create_app
+from schedule_service.app import create_app as create_production_app
 from schedule_service.application.errors import ScheduleConflict
 from schedule_service.config import Settings
 from schedule_service.domain.lesson import Lesson
 from schedule_service.infrastructure.database import create_engine
+
+
+def create_app(settings: Settings, engine, uow_factory):
+    return create_production_app(
+        settings,
+        engine,
+        uow_factory,
+        NoopScheduleCache(),
+    )
 
 
 @dataclass
@@ -21,11 +31,15 @@ class FakeIdempotencyRepository:
     def __init__(self) -> None:
         self.records: dict[tuple[str, str], FakeIdempotencyRecord] = {}
 
-    async def claim(self, operation: str, key: str, request_hash: str) -> FakeIdempotencyRecord | None:
+    async def claim(
+        self, operation: str, key: str, request_hash: str
+    ) -> FakeIdempotencyRecord | None:
         record = self.records.get((operation, key))
 
         if record is None:
-            self.records[(operation, key)] = FakeIdempotencyRecord(request_hash=request_hash)
+            self.records[(operation, key)] = FakeIdempotencyRecord(
+                request_hash=request_hash
+            )
             return None
 
         return record
@@ -498,7 +512,9 @@ def test_create_lesson_rejects_reused_idempotency_key_for_different_request() ->
             "starts_at": "2026-09-08T10:00:00Z",
             "ends_at": "2026-09-08T11:00:00Z",
         }
-        first_response = client.post("/lessons", headers={"Idempotency-Key": "k1"}, json=original_request_body)
+        first_response = client.post(
+            "/lessons", headers={"Idempotency-Key": "k1"}, json=original_request_body
+        )
 
         different_request_body = {
             "class_id": 10,
@@ -507,9 +523,13 @@ def test_create_lesson_rejects_reused_idempotency_key_for_different_request() ->
             "starts_at": "2026-09-08T12:00:00Z",
             "ends_at": "2026-09-08T13:00:00Z",
         }
-        second_response = client.post("/lessons", headers={"Idempotency-Key": "k1"}, json=different_request_body)
+        second_response = client.post(
+            "/lessons", headers={"Idempotency-Key": "k1"}, json=different_request_body
+        )
 
     assert first_response.status_code == 201
     assert fake_uow.lessons.add_calls == 1
     assert second_response.status_code == 409
-    assert second_response.json() == {"detail": "Idempotency key was already used for another request"}
+    assert second_response.json() == {
+        "detail": "Idempotency key was already used for another request"
+    }

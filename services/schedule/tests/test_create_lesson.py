@@ -17,11 +17,15 @@ class FakeIdempotencyRepository:
     def __init__(self) -> None:
         self.records: dict[tuple[str, str], FakeIdempotencyRecord] = {}
 
-    async def claim(self, operation: str, key: str, request_hash: str) -> FakeIdempotencyRecord | None:
+    async def claim(
+        self, operation: str, key: str, request_hash: str
+    ) -> FakeIdempotencyRecord | None:
         record = self.records.get((operation, key))
 
         if record is None:
-            self.records[(operation, key)] = FakeIdempotencyRecord(request_hash=request_hash)
+            self.records[(operation, key)] = FakeIdempotencyRecord(
+                request_hash=request_hash
+            )
             return None
 
         return record

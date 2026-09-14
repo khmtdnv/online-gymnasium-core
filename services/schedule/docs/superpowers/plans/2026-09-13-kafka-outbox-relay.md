@@ -179,7 +179,12 @@
   Implement `get_pending` with a SQLAlchemy `select(OutboxEventRow)`:
 
   ```python
-  statement = select(OutboxEventRow).where(OutboxEventRow.published_at.is_(None)).order_by(OutboxEventRow.id).limit(limit)
+  statement = (
+      select(OutboxEventRow)
+      .where(OutboxEventRow.published_at.is_(None))
+      .order_by(OutboxEventRow.id)
+      .limit(limit)
+  )
   rows = (await self._session.scalars(statement)).all()
   ```
 

@@ -129,7 +129,9 @@ class SqlAlchemyLessonRepository:
             version=row.version,
         )
 
-    async def list_planned_for_class_on_day(self, *, class_id: int, day: date) -> list[Lesson]:
+    async def list_planned_for_class_on_day(
+        self, *, class_id: int, day: date
+    ) -> list[Lesson]:
         day_start = datetime.combine(day, time.min, tzinfo=UTC)
         day_end = day_start + timedelta(days=1)
 

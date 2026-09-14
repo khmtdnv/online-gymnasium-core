@@ -19,9 +19,13 @@ async def run() -> None:
     settings = RelaySettings()
     engine = create_engine(settings.database_url)
     session_factory = create_session_factory(engine)
-    producer = AIOKafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers, acks="all")
+    producer = AIOKafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers, acks="all"
+    )
     publisher = KafkaEventPublisher(producer, topic="schedule.lessons")
-    relay = OutboxRelay(uow_factory=lambda: SqlAlchemyUnitOfWork(session_factory), publisher=publisher)
+    relay = OutboxRelay(
+        uow_factory=lambda: SqlAlchemyUnitOfWork(session_factory), publisher=publisher
+    )
 
     try:
         await producer.start()

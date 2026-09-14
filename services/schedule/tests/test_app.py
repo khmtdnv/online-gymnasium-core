@@ -1,4 +1,5 @@
 import pytest
+from conftest import NoopScheduleCache
 
 from schedule_service.app import create_app
 from schedule_service.application.ports.unit_of_work import UnitOfWorkFactory
@@ -20,7 +21,12 @@ async def test_create_app_uses_title_from_settings(
     test_engine = create_engine(url=test_settings.database_url)
 
     try:
-        test_app = create_app(test_settings, test_engine, unused_uow_factory)
+        test_app = create_app(
+            test_settings,
+            test_engine,
+            unused_uow_factory,
+            NoopScheduleCache(),
+        )
         assert test_app.title == test_app_name
         assert test_app.state.engine is test_engine
     finally:

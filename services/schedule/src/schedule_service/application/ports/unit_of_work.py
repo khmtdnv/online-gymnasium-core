@@ -1,7 +1,9 @@
 from collections.abc import Callable
 from typing import Protocol, Self
 
-from schedule_service.application.ports.idempotency_repository import IdempotencyRepository
+from schedule_service.application.ports.idempotency_repository import (
+    IdempotencyRepository,
+)
 from schedule_service.application.ports.lesson_repository import LessonRepository
 from schedule_service.application.ports.outbox_repository import OutboxRepository
 

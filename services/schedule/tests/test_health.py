@@ -1,3 +1,4 @@
+from conftest import NoopScheduleCache
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -15,7 +16,12 @@ def test_liveness_endpoint_returns_ok(unused_uow_factory: UnitOfWorkFactory) -> 
         rabbitmq_url="Test URL",
     )
     test_engine: AsyncEngine = create_engine(test_settings.database_url)
-    test_app = create_app(test_settings, test_engine, unused_uow_factory)
+    test_app = create_app(
+        test_settings,
+        test_engine,
+        unused_uow_factory,
+        NoopScheduleCache(),
+    )
     with TestClient(test_app) as test_client:
         response = test_client.get("/health/live")
 

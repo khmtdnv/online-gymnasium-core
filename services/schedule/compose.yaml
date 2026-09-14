@@ -28,7 +28,16 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
-
+  redis:
+    image: redis:8.10.1-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
   postgres:
     image: postgres:18
     env_file:
@@ -90,12 +99,15 @@ services:
       - -c
       - >
         DATABASE_URL="postgresql+asyncpg://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres:5432/$${POSTGRES_DB}"
+        REDIS_URL="redis://redis:6379/0"
         exec poetry run uvicorn schedule_service.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     depends_on:
       migrations:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test:
         [

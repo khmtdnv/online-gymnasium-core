@@ -3,7 +3,9 @@ from typing import Self
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from schedule_service.infrastructure.idempotency_repository import SqlAlchemyIdempotencyRepository
+from schedule_service.infrastructure.idempotency_repository import (
+    SqlAlchemyIdempotencyRepository,
+)
 from schedule_service.infrastructure.lesson_repository import SqlAlchemyLessonRepository
 from schedule_service.infrastructure.outbox_repository import SqlAlchemyOutboxRepository
 

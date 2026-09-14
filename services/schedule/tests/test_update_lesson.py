@@ -3,7 +3,10 @@ from typing import Self
 
 import pytest
 
-from schedule_service.application.update_lesson import UpdateLessonCommand, UpdateLessonHandler
+from schedule_service.application.update_lesson import (
+    UpdateLessonCommand,
+    UpdateLessonHandler,
+)
 from schedule_service.domain.lesson import Lesson
 
 

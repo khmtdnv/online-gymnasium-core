@@ -16,7 +16,9 @@ class ScheduledLessonRow(Base):
     subject_id: Mapped[int] = mapped_column(Integer, nullable=False)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="planned")
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="planned"
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
     __table_args__ = (

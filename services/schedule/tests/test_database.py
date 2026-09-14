@@ -19,7 +19,9 @@ async def test_db_engine() -> None:
 async def test_session_factory_creates_async_session() -> None:
     from schedule_service.infrastructure.database import create_session_factory
 
-    engine = create_engine(url="postgresql+asyncpg://schedule:password@localhost:5432/schedule")
+    engine = create_engine(
+        url="postgresql+asyncpg://schedule:password@localhost:5432/schedule"
+    )
     session_factory = create_session_factory(engine)
     session = session_factory()
 

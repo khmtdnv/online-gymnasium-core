@@ -27,7 +27,9 @@ class UpdateLessonHandler:
 
             lesson.reschedule(starts_at=command.starts_at, ends_at=command.ends_at)
 
-            updated_lesson = await uow.lessons.update(lesson=lesson, expected_version=command.expected_version)
+            updated_lesson = await uow.lessons.update(
+                lesson=lesson, expected_version=command.expected_version
+            )
 
             if updated_lesson is None:
                 raise VersionConflict
