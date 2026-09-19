@@ -2,24 +2,23 @@ import asyncio
 import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import pytest
+from aiokafka.structs import TopicPartition
 
 from analytics_service.application.snapshot import LessonSnapshot
 
 
 class FakeConsumer:
-    def __init__(self, messages: list[SimpleNamespace]) -> None:
-        self._messages = messages
+    def __init__(
+        self,
+        batches: list[dict[TopicPartition, list[SimpleNamespace]]],
+    ) -> None:
         self.start = AsyncMock()
         self.stop = AsyncMock()
         self.commit = AsyncMock()
-
-    async def __aiter__(self):
-        for message in self._messages:
-            yield message
-        raise asyncio.CancelledError
+        self.getmany = AsyncMock(side_effect=[*batches, asyncio.CancelledError])
 
 
 class FakeProducer:
@@ -29,25 +28,67 @@ class FakeProducer:
         self.send_and_wait = AsyncMock()
 
 
-def lesson_snapshot_message() -> SimpleNamespace:
+def snapshot_message(
+    *,
+    event_id: int = 42,
+    lesson_id: int = 501,
+    class_id: int = 10,
+    teacher_id: int = 100,
+    subject_id: int = 1000,
+    starts_at: str = "2026-09-20T10:00:00+00:00",
+    ends_at: str = "2026-09-20T11:30:00+00:00",
+    status: str = "planned",
+    version: int = 3,
+    partition: int = 0,
+    offset: int = 7,
+) -> SimpleNamespace:
     return SimpleNamespace(
+        topic="schedule.lessons",
+        partition=partition,
+        offset=offset,
         value=json.dumps(
             {
-                "event_id": 42,
+                "event_id": event_id,
                 "event_type": "lesson.snapshot",
                 "occurred_at": "2026-09-19T10:00:00+00:00",
                 "payload": {
-                    "lesson_id": 501,
-                    "class_id": 10,
-                    "teacher_id": 100,
-                    "subject_id": 1000,
-                    "starts_at": "2026-09-20T10:00:00+00:00",
-                    "ends_at": "2026-09-20T11:30:00+00:00",
-                    "status": "planned",
-                    "version": 3,
+                    "lesson_id": lesson_id,
+                    "class_id": class_id,
+                    "teacher_id": teacher_id,
+                    "subject_id": subject_id,
+                    "starts_at": starts_at,
+                    "ends_at": ends_at,
+                    "status": status,
+                    "version": version,
                 },
             }
-        ).encode()
+        ).encode(),
+    )
+
+
+def expected_snapshot(
+    *,
+    event_id: int = 42,
+    lesson_id: int = 501,
+    class_id: int = 10,
+    teacher_id: int = 100,
+    subject_id: int = 1000,
+    starts_at: datetime = datetime(2026, 9, 20, 10, tzinfo=UTC),
+    ends_at: datetime = datetime(2026, 9, 20, 11, 30, tzinfo=UTC),
+    status: str = "planned",
+    version: int = 3,
+) -> LessonSnapshot:
+    return LessonSnapshot(
+        event_id=event_id,
+        occurred_at=datetime(2026, 9, 19, 10, tzinfo=UTC),
+        lesson_id=lesson_id,
+        class_id=class_id,
+        teacher_id=teacher_id,
+        subject_id=subject_id,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        status=status,
+        version=version,
     )
 
 
@@ -73,7 +114,7 @@ def configure_worker(
 
     monkeypatch.setattr(worker, "AnalyticsSettings", lambda: settings)
     monkeypatch.setattr(worker, "AIOKafkaConsumer", consumer_factory)
-    monkeypatch.setattr(worker, "AIOKafkaProducer", producer_factory, raising=False)
+    monkeypatch.setattr(worker, "AIOKafkaProducer", producer_factory)
     monkeypatch.setattr(
         worker.clickhouse_connect, "get_client", Mock(return_value=clickhouse_client)
     )
@@ -83,10 +124,31 @@ def configure_worker(
 
 
 @pytest.mark.anyio
-async def test_worker_persists_snapshot_before_committing_offset(
+async def test_worker_persists_snapshot_batch_before_committing_partition_offset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    consumer = FakeConsumer([lesson_snapshot_message()])
+    topic_partition = TopicPartition("schedule.lessons", 0)
+    consumer = FakeConsumer(
+        [
+            {
+                topic_partition: [
+                    snapshot_message(offset=10),
+                    snapshot_message(
+                        event_id=43,
+                        lesson_id=502,
+                        class_id=11,
+                        teacher_id=101,
+                        subject_id=1001,
+                        starts_at="2026-09-20T12:00:00+00:00",
+                        ends_at="2026-09-20T12:45:00+00:00",
+                        status="canceled",
+                        version=4,
+                        offset=11,
+                    ),
+                ]
+            }
+        ]
+    )
     repository = AsyncMock()
     consumer_factory, _, clickhouse_client_factory = configure_worker(
         monkeypatch, consumer, repository
@@ -110,37 +172,57 @@ async def test_worker_persists_snapshot_before_committing_offset(
         username="default",
         password="change-me",
     )
-    repository.add.assert_awaited_once_with(
-        LessonSnapshot(
-            event_id=42,
-            occurred_at=datetime(2026, 9, 19, 10, tzinfo=UTC),
-            lesson_id=501,
-            class_id=10,
-            teacher_id=100,
-            subject_id=1000,
-            starts_at=datetime(2026, 9, 20, 10, tzinfo=UTC),
-            ends_at=datetime(2026, 9, 20, 11, 30, tzinfo=UTC),
-            status="planned",
-            version=3,
-        )
+    first_getmany_call = consumer.getmany.await_args_list[0]
+    assert first_getmany_call.args == ()
+    assert first_getmany_call.kwargs == {"timeout_ms": 1000, "max_records": 100}
+    repository.add_many.assert_awaited_once_with(
+        [
+            expected_snapshot(),
+            expected_snapshot(
+                event_id=43,
+                lesson_id=502,
+                class_id=11,
+                teacher_id=101,
+                subject_id=1001,
+                starts_at=datetime(2026, 9, 20, 12, tzinfo=UTC),
+                ends_at=datetime(2026, 9, 20, 12, 45, tzinfo=UTC),
+                status="canceled",
+                version=4,
+            ),
+        ]
     )
-    consumer.commit.assert_awaited_once()
+    consumer.commit.assert_awaited_once_with({topic_partition: 12})
     consumer.stop.assert_awaited_once()
 
 
 @pytest.mark.anyio
-async def test_worker_commits_unrelated_event_after_deliberate_ignore(
+async def test_worker_inserts_snapshots_from_multiple_partitions_in_one_batch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    message = SimpleNamespace(
-        value=json.dumps(
+    first_partition = TopicPartition("schedule.lessons", 0)
+    second_partition = TopicPartition("schedule.lessons", 1)
+    consumer = FakeConsumer(
+        [
             {
-                "event_type": "schedule.changed",
-                "payload": {"lesson_id": 501},
+                first_partition: [snapshot_message(offset=10)],
+                second_partition: [
+                    snapshot_message(
+                        event_id=43,
+                        lesson_id=502,
+                        class_id=11,
+                        teacher_id=101,
+                        subject_id=1001,
+                        starts_at="2026-09-20T12:00:00+00:00",
+                        ends_at="2026-09-20T12:45:00+00:00",
+                        status="canceled",
+                        version=4,
+                        partition=1,
+                        offset=20,
+                    )
+                ],
             }
-        ).encode()
+        ]
     )
-    consumer = FakeConsumer([message])
     repository = AsyncMock()
     configure_worker(monkeypatch, consumer, repository)
 
@@ -149,22 +231,88 @@ async def test_worker_commits_unrelated_event_after_deliberate_ignore(
     with pytest.raises(asyncio.CancelledError):
         await worker.run()
 
-    repository.add.assert_not_awaited()
-    consumer.commit.assert_awaited_once()
-    consumer.stop.assert_awaited_once()
+    repository.add_many.assert_awaited_once_with(
+        [
+            expected_snapshot(),
+            expected_snapshot(
+                event_id=43,
+                lesson_id=502,
+                class_id=11,
+                teacher_id=101,
+                subject_id=1001,
+                starts_at=datetime(2026, 9, 20, 12, tzinfo=UTC),
+                ends_at=datetime(2026, 9, 20, 12, 45, tzinfo=UTC),
+                status="canceled",
+                version=4,
+            ),
+        ]
+    )
+    consumer.commit.assert_has_awaits(
+        [
+            call({first_partition: 11}),
+            call({second_partition: 21}),
+        ]
+    )
 
 
 @pytest.mark.anyio
-async def test_worker_moves_malformed_event_to_dlq_then_commits_source_offset(
+async def test_worker_does_not_insert_or_commit_empty_poll(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    consumer = FakeConsumer([{}])
+    repository = AsyncMock()
+    configure_worker(monkeypatch, consumer, repository)
+
+    from analytics_service.workers import worker
+
+    with pytest.raises(asyncio.CancelledError):
+        await worker.run()
+
+    repository.add_many.assert_not_awaited()
+    consumer.commit.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_worker_commits_ignored_event_partition_without_clickhouse_insert(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic_partition = TopicPartition("schedule.lessons", 0)
+    message = SimpleNamespace(
+        topic="schedule.lessons",
+        partition=0,
+        offset=7,
+        value=json.dumps(
+            {
+                "event_type": "schedule.changed",
+                "payload": {"lesson_id": 501},
+            }
+        ).encode(),
+    )
+    consumer = FakeConsumer([{topic_partition: [message]}])
+    repository = AsyncMock()
+    configure_worker(monkeypatch, consumer, repository)
+
+    from analytics_service.workers import worker
+
+    with pytest.raises(asyncio.CancelledError):
+        await worker.run()
+
+    repository.add_many.assert_not_awaited()
+    consumer.commit.assert_awaited_once_with({topic_partition: 8})
+
+
+@pytest.mark.anyio
+async def test_worker_moves_malformed_event_to_dlq_then_commits_partition_offset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic_partition = TopicPartition("schedule.lessons", 0)
     message = SimpleNamespace(
         topic="schedule.lessons",
         partition=0,
         offset=7,
         value=b"not-json",
     )
-    consumer = FakeConsumer([message])
+    consumer = FakeConsumer([{topic_partition: [message]}])
     producer = FakeProducer()
     repository = AsyncMock()
     _, producer_factory, _ = configure_worker(
@@ -192,8 +340,8 @@ async def test_worker_moves_malformed_event_to_dlq_then_commits_source_offset(
         "error_message": "Expecting value: line 1 column 1 (char 0)",
         "original_value_base64": "bm90LWpzb24=",
     }
-    repository.add.assert_not_awaited()
-    consumer.commit.assert_awaited_once()
+    repository.add_many.assert_not_awaited()
+    consumer.commit.assert_awaited_once_with({topic_partition: 8})
     producer.stop.assert_awaited_once()
     consumer.stop.assert_awaited_once()
 
@@ -202,13 +350,14 @@ async def test_worker_moves_malformed_event_to_dlq_then_commits_source_offset(
 async def test_worker_does_not_commit_when_dlq_publish_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    topic_partition = TopicPartition("schedule.lessons", 0)
     message = SimpleNamespace(
         topic="schedule.lessons",
         partition=0,
         offset=7,
         value=b"not-json",
     )
-    consumer = FakeConsumer([message])
+    consumer = FakeConsumer([{topic_partition: [message]}])
     producer = FakeProducer()
     producer.send_and_wait.side_effect = RuntimeError("Kafka is unavailable")
     repository = AsyncMock()
@@ -225,12 +374,13 @@ async def test_worker_does_not_commit_when_dlq_publish_fails(
 
 
 @pytest.mark.anyio
-async def test_worker_does_not_commit_when_clickhouse_insert_fails(
+async def test_worker_does_not_commit_when_clickhouse_batch_insert_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    consumer = FakeConsumer([lesson_snapshot_message()])
+    topic_partition = TopicPartition("schedule.lessons", 0)
+    consumer = FakeConsumer([{topic_partition: [snapshot_message()]}])
     repository = AsyncMock()
-    repository.add.side_effect = RuntimeError("ClickHouse is unavailable")
+    repository.add_many.side_effect = RuntimeError("ClickHouse is unavailable")
     configure_worker(monkeypatch, consumer, repository)
 
     from analytics_service.workers import worker

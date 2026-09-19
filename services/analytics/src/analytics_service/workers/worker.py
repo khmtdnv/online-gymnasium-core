@@ -39,27 +39,52 @@ async def run() -> None:
         await consumer.start()
         await producer.start()
 
-        async for message in consumer:
+        while True:
             try:
-                try:
-                    envelope = json.loads(message.value)
-                    snapshot = parse_lesson_snapshot(envelope)
-                except (
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    TypeError,
-                    ValueError,
-                ) as exc:
+                fetched = await consumer.getmany(
+                    timeout_ms=1000,
+                    max_records=100,
+                )
+
+                snapshots = []
+                malformed_messages = []
+                offsets_to_commit = {}
+
+                for topic_partition, messages in fetched.items():
+                    if not messages:
+                        continue
+
+                    offsets_to_commit[topic_partition] = messages[-1].offset + 1
+
+                    for message in messages:
+                        try:
+                            envelope = json.loads(message.value)
+                            snapshot = parse_lesson_snapshot(envelope)
+                        except (
+                            json.JSONDecodeError,
+                            UnicodeDecodeError,
+                            TypeError,
+                            ValueError,
+                        ) as exc:
+                            malformed_messages.append((message, exc))
+                        else:
+                            if snapshot is not None:
+                                snapshots.append(snapshot)
+
+                if snapshots:
+                    await repository.add_many(snapshots)
+
+                for malformed_message, exc in malformed_messages:
                     dlq_envelope = {
-                        "source_topic": message.topic,
-                        "source_partition": message.partition,
-                        "source_offset": message.offset,
+                        "source_topic": malformed_message.topic,
+                        "source_partition": malformed_message.partition,
+                        "source_offset": malformed_message.offset,
                         "failed_at": datetime.now(UTC).isoformat(),
                         "error_type": type(exc).__name__,
                         "error_message": str(exc),
-                        "original_value_base64": base64.b64encode(message.value).decode(
-                            "ascii"
-                        ),
+                        "original_value_base64": base64.b64encode(
+                            malformed_message.value
+                        ).decode("ascii"),
                     }
                     await producer.send_and_wait(
                         settings.analytics_dlq_topic,
@@ -69,16 +94,12 @@ async def run() -> None:
                             separators=(",", ":"),
                         ).encode(),
                     )
-                    await consumer.commit()
 
-                    continue
+                for topic_partition, next_offset in offsets_to_commit.items():
+                    await consumer.commit({topic_partition: next_offset})
 
-                if snapshot is not None:
-                    await repository.add(snapshot)
-
-                await consumer.commit()
             except Exception:
-                logger.exception("Analytics worker failed to process Kafka event")
+                logger.exception("Analytics worker failed to process Kafka batch")
                 raise
     finally:
         await consumer.stop()
