@@ -164,6 +164,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_PORT: 8123
+      ANALYTICS_DLQ_TOPIC: analytics.lesson-snapshots.dlq
     command:
       - poetry
       - run

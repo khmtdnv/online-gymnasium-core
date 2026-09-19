@@ -4,6 +4,7 @@ def test_analytics_settings_read_kafka_and_clickhouse_values_from_environment(
     from analytics_service.config import AnalyticsSettings
 
     monkeypatch.setenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:19092")
+    monkeypatch.setenv("ANALYTICS_DLQ_TOPIC", "analytics.lesson-snapshots.dlq")
     monkeypatch.setenv("CLICKHOUSE_HOST", "clickhouse")
     monkeypatch.setenv("CLICKHOUSE_PORT", "8123")
     monkeypatch.setenv("CLICKHOUSE_USER", "default")
@@ -12,6 +13,7 @@ def test_analytics_settings_read_kafka_and_clickhouse_values_from_environment(
     settings = AnalyticsSettings()
 
     assert settings.kafka_bootstrap_servers == "kafka:19092"
+    assert settings.analytics_dlq_topic == "analytics.lesson-snapshots.dlq"
     assert settings.clickhouse_host == "clickhouse"
     assert settings.clickhouse_port == 8123
     assert settings.clickhouse_user == "default"
