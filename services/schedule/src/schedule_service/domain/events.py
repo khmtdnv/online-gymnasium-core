@@ -3,7 +3,14 @@ from datetime import date, datetime
 
 
 @dataclass(frozen=True, slots=True)
-class LessonCreated:
+class ScheduleChanged:
+    lesson_id: int
+    class_id: int
+    affected_dates: tuple[date, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class LessonSnapshot:
     lesson_id: int
     class_id: int
     teacher_id: int
@@ -12,10 +19,3 @@ class LessonCreated:
     ends_at: datetime
     status: str
     version: int
-
-
-@dataclass(frozen=True, slots=True)
-class ScheduleChanged:
-    lesson_id: int
-    class_id: int
-    affected_dates: tuple[date, ...]

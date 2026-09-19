@@ -38,8 +38,8 @@ The envelope has:
 - event_id: stable identity, derived from the outbox row;
 - event_type: an explicit analytics lesson-snapshot event name;
 - occurred_at: when the schedule command committed its intended change;
-- payload: lesson_id, class_id, starts_at, ends_at, status, and monotonic
-  lesson version.
+- payload: lesson_id, class_id, teacher_id, subject_id, starts_at, ends_at,
+  status, and monotonic lesson version.
 
 Each event describes the full resulting lesson state, rather than a partial
 patch. A cancelled lesson is retained with status = cancelled; it is not
@@ -77,7 +77,7 @@ Append-only input table.
 Columns:
 
 - event_id, occurred_at;
-- lesson_id, class_id;
+- lesson_id, class_id, teacher_id, subject_id;
 - starts_at, ends_at;
 - status, version.
 

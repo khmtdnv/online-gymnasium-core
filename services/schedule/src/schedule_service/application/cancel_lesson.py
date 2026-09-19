@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from schedule_service.application.errors import LessonNotFound, VersionConflict
 from schedule_service.application.ports.unit_of_work import UnitOfWorkFactory
-from schedule_service.domain.events import ScheduleChanged
+from schedule_service.domain.events import LessonSnapshot, ScheduleChanged
 from schedule_service.domain.lesson import Lesson
 
 
@@ -37,6 +37,18 @@ class CancelLessonHandler:
                     lesson_id=canceled_lesson.id,
                     class_id=canceled_lesson.class_id,
                     affected_dates=(canceled_lesson.starts_at.date(),),
+                )
+            )
+            await uow.outbox.add(
+                LessonSnapshot(
+                    lesson_id=canceled_lesson.id,
+                    class_id=canceled_lesson.class_id,
+                    teacher_id=canceled_lesson.teacher_id,
+                    subject_id=canceled_lesson.subject_id,
+                    starts_at=canceled_lesson.starts_at,
+                    ends_at=canceled_lesson.ends_at,
+                    status=canceled_lesson.status,
+                    version=canceled_lesson.version,
                 )
             )
 

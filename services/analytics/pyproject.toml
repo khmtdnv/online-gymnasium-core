@@ -1,0 +1,35 @@
+[project]
+name = "analytics-service"
+version = "0.1.0"
+description = "OG1 analytics service"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+    "aiokafka (>=0.14.0,<0.15.0)",
+    "clickhouse-connect (>=1.8.0,<2.0.0)",
+    "pydantic-settings (>=2.15.0,<3.0.0)",
+    "fastapi (>=0.115.0,<1.0.0)",
+    "uvicorn (>=0.34.0,<1.0.0)",
+]
+
+[tool.poetry]
+packages = [
+    { include = "analytics_service", from = "src" }
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+[dependency-groups]
+dev = [
+    "anyio (>=4.14.0,<5.0.0)",
+    "ruff (>=0.16.5,<0.17.0)",
+    "pytest (>=9.1.1,<10.0.0)",
+    "httpx (>=0.28.0,<1.0.0)",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+
+[tool.ruff.lint]
+extend-select = ["I"]

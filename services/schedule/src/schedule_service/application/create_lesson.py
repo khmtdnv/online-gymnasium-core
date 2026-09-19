@@ -3,7 +3,7 @@ from datetime import datetime
 
 from schedule_service.application.errors import IdempotencyKeyReuse
 from schedule_service.application.ports.unit_of_work import UnitOfWorkFactory
-from schedule_service.domain.events import LessonCreated, ScheduleChanged
+from schedule_service.domain.events import LessonSnapshot, ScheduleChanged
 from schedule_service.domain.lesson import Lesson
 
 
@@ -51,7 +51,14 @@ class CreateLessonHandler:
             assert db_lesson.id is not None
 
             await uow.outbox.add(
-                LessonCreated(
+                ScheduleChanged(
+                    lesson_id=db_lesson.id,
+                    class_id=db_lesson.class_id,
+                    affected_dates=(db_lesson.starts_at.date(),),
+                )
+            )
+            await uow.outbox.add(
+                LessonSnapshot(
                     lesson_id=db_lesson.id,
                     class_id=db_lesson.class_id,
                     teacher_id=db_lesson.teacher_id,
@@ -60,13 +67,6 @@ class CreateLessonHandler:
                     ends_at=db_lesson.ends_at,
                     status=db_lesson.status,
                     version=db_lesson.version,
-                )
-            )
-            await uow.outbox.add(
-                ScheduleChanged(
-                    lesson_id=db_lesson.id,
-                    class_id=db_lesson.class_id,
-                    affected_dates=(db_lesson.starts_at.date(),),
                 )
             )
 

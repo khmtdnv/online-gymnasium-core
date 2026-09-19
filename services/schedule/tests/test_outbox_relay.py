@@ -47,13 +47,13 @@ async def test_relay_publishes_pending_events_after_read_uow_is_closed() -> None
     events = [
         PendingOutboxEvent(
             id=7,
-            event_type="lesson.created",
+            event_type="lesson.snapshot",
             payload={"lesson_id": 501},
             created_at=datetime(2026, 9, 13, 10, tzinfo=UTC),
         ),
         PendingOutboxEvent(
             id=8,
-            event_type="lesson.created",
+            event_type="lesson.snapshot",
             payload={"lesson_id": 502},
             created_at=datetime(2026, 9, 13, 11, tzinfo=UTC),
         ),
@@ -77,7 +77,7 @@ async def test_relay_does_not_mark_or_continue_after_publish_failure() -> None:
 
     event = PendingOutboxEvent(
         id=7,
-        event_type="lesson.created",
+        event_type="lesson.snapshot",
         payload={"lesson_id": 501},
         created_at=datetime(2026, 9, 13, 10, tzinfo=UTC),
     )

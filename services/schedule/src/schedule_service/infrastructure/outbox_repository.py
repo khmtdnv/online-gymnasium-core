@@ -2,7 +2,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from schedule_service.application.ports.outbox_repository import PendingOutboxEvent
-from schedule_service.domain.events import LessonCreated, ScheduleChanged
+from schedule_service.domain.events import LessonSnapshot, ScheduleChanged
 from schedule_service.infrastructure.models.outbox_event import OutboxEventRow
 
 
@@ -10,10 +10,22 @@ class SqlAlchemyOutboxRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def add(self, event: LessonCreated | ScheduleChanged) -> None:
-        if isinstance(event, LessonCreated):
+    async def add(
+        self,
+        event: ScheduleChanged | LessonSnapshot,
+    ) -> None:
+        if isinstance(event, ScheduleChanged):
             row = OutboxEventRow(
-                event_type="lesson.created",
+                event_type="schedule.changed",
+                payload={
+                    "lesson_id": event.lesson_id,
+                    "class_id": event.class_id,
+                    "affected_dates": [day.isoformat() for day in event.affected_dates],
+                },
+            )
+        elif isinstance(event, LessonSnapshot):
+            row = OutboxEventRow(
+                event_type="lesson.snapshot",
                 payload={
                     "lesson_id": event.lesson_id,
                     "class_id": event.class_id,
@@ -23,15 +35,6 @@ class SqlAlchemyOutboxRepository:
                     "ends_at": event.ends_at.isoformat(),
                     "status": event.status,
                     "version": event.version,
-                },
-            )
-        elif isinstance(event, ScheduleChanged):
-            row = OutboxEventRow(
-                event_type="schedule.changed",
-                payload={
-                    "lesson_id": event.lesson_id,
-                    "class_id": event.class_id,
-                    "affected_dates": [day.isoformat() for day in event.affected_dates],
                 },
             )
         else:

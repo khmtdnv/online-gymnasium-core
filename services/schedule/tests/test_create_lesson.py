@@ -4,7 +4,7 @@ from typing import Self
 
 import pytest
 
-from schedule_service.domain.events import ScheduleChanged
+from schedule_service.domain.events import LessonSnapshot, ScheduleChanged
 from schedule_service.domain.lesson import Lesson
 
 
@@ -113,7 +113,7 @@ async def test_handler_creates_lesson_through_uow() -> None:
 
 
 @pytest.mark.anyio
-async def test_handler_queues_lesson_created_event_after_creating_lesson() -> None:
+async def test_handler_queues_lesson_snapshot_after_creating_lesson() -> None:
     from schedule_service.application.create_lesson import (
         CreateLessonCommand,
         CreateLessonHandler,
@@ -132,19 +132,21 @@ async def test_handler_queues_lesson_created_event_after_creating_lesson() -> No
     await handler.handle(command)
 
     assert len(fake_uow.outbox.events) == 2
-    lesson_created, schedule_changed = fake_uow.outbox.events
-    assert lesson_created.lesson_id == 501
-    assert lesson_created.class_id == 10
-    assert lesson_created.teacher_id == 100
-    assert lesson_created.subject_id == 1000
-    assert lesson_created.starts_at == command.starts_at
-    assert lesson_created.ends_at == command.ends_at
-    assert lesson_created.status == "planned"
-    assert lesson_created.version == 1
+    schedule_changed, lesson_snapshot = fake_uow.outbox.events
     assert schedule_changed == ScheduleChanged(
         lesson_id=501,
         class_id=10,
         affected_dates=(date(2026, 9, 13),),
+    )
+    assert lesson_snapshot == LessonSnapshot(
+        lesson_id=501,
+        class_id=10,
+        teacher_id=100,
+        subject_id=1000,
+        starts_at=command.starts_at,
+        ends_at=command.ends_at,
+        status="planned",
+        version=1,
     )
 
 

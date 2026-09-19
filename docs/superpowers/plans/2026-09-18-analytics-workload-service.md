@@ -50,8 +50,8 @@ pytest and Ruff.
 **Files:** events.py, create_lesson.py, update_lesson.py, cancel_lesson.py,
 outbox repository port and adapter; create/update/cancel/outbox tests.
 
-**Interface produced:** LessonSnapshot has lesson_id, class_id, starts_at,
-ends_at, status and version. The outbox adapter maps it to event type
+**Interface produced:** LessonSnapshot has lesson_id, class_id, teacher_id,
+subject_id, starts_at, ends_at, status and version. The outbox adapter maps it to event type
 lesson.snapshot and an ISO JSON payload with those fields.
 
 - [ ] Codex writes failing tests. Each successful create, reschedule and cancel
@@ -60,7 +60,8 @@ lesson.snapshot and an ISO JSON payload with those fields.
 - [ ] Codex runs targeted schedule tests and confirms RED.
 - [ ] Learner adds LessonSnapshot and accepts it in the outbox protocol/adapter.
 - [ ] Learner emits it after every successful persistence and before UoW exit.
-  ScheduleChanged remains unchanged for cache invalidation.
+  Replace LessonCreated with LessonSnapshot on creation; ScheduleChanged
+  remains unchanged for cache invalidation.
 - [ ] Codex runs targeted tests, full schedule Ruff checks and commits
   feat: publish lesson snapshots for analytics.
 
@@ -91,7 +92,8 @@ CLICKHOUSE_HOST and CLICKHOUSE_PORT. Compose exposes ClickHouse HTTP at host
 **Files:** create services/analytics/sql/001_schema.sql and test_schema.py.
 
 **Interface produced:** lesson_snapshots stores event_id, occurred_at,
-lesson_id, class_id, starts_at, ends_at, status and version in append-only
+lesson_id, class_id, teacher_id, subject_id, starts_at, ends_at, status and
+version in append-only
 MergeTree storage. class_daily_workload stores class_id, day, planned count,
 planned minutes and refreshed_at.
 

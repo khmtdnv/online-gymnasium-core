@@ -12,3 +12,4 @@ __pycache__/
 .env.*
 !.env.example
 services/schedule/.postgres.env
+services/analytics/.clickhouse.env

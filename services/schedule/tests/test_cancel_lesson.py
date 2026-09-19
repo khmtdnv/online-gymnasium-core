@@ -3,7 +3,7 @@ from typing import Self
 
 import pytest
 
-from schedule_service.domain.events import ScheduleChanged
+from schedule_service.domain.events import LessonSnapshot, ScheduleChanged
 from schedule_service.domain.lesson import Lesson
 
 
@@ -95,7 +95,17 @@ async def test_handler_cancels_planned_lesson() -> None:
             lesson_id=501,
             class_id=10,
             affected_dates=(date(2026, 9, 10),),
-        )
+        ),
+        LessonSnapshot(
+            lesson_id=501,
+            class_id=10,
+            teacher_id=100,
+            subject_id=1000,
+            starts_at=datetime(2026, 9, 10, 10, tzinfo=UTC),
+            ends_at=datetime(2026, 9, 10, 11, tzinfo=UTC),
+            status="canceled",
+            version=4,
+        ),
     ]
 
 

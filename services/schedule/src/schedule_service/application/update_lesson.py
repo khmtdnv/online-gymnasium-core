@@ -3,7 +3,7 @@ from datetime import datetime
 
 from schedule_service.application.errors import LessonNotFound, VersionConflict
 from schedule_service.application.ports.unit_of_work import UnitOfWorkFactory
-from schedule_service.domain.events import ScheduleChanged
+from schedule_service.domain.events import LessonSnapshot, ScheduleChanged
 from schedule_service.domain.lesson import Lesson
 
 
@@ -46,6 +46,18 @@ class UpdateLessonHandler:
                     affected_dates=tuple(
                         sorted({old_day, updated_lesson.starts_at.date()})
                     ),
+                )
+            )
+            await uow.outbox.add(
+                LessonSnapshot(
+                    lesson_id=updated_lesson.id,
+                    class_id=updated_lesson.class_id,
+                    teacher_id=updated_lesson.teacher_id,
+                    subject_id=updated_lesson.subject_id,
+                    starts_at=updated_lesson.starts_at,
+                    ends_at=updated_lesson.ends_at,
+                    status=updated_lesson.status,
+                    version=updated_lesson.version,
                 )
             )
 

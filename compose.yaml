@@ -41,7 +41,7 @@ services:
   postgres:
     image: postgres:18
     env_file:
-      - .postgres.env
+      - ./services/schedule/.postgres.env
     ports:
       - "5432:5432"
     volumes:
@@ -55,10 +55,10 @@ services:
 
   migrations:
     build:
-      context: .
+      context: ./services/schedule
     env_file:
-      - .env
-      - .postgres.env
+      - ./services/schedule/.env
+      - ./services/schedule/.postgres.env
     command:
       - /bin/sh
       - -c
@@ -71,10 +71,10 @@ services:
 
   outbox-relay:
     build:
-      context: .
+      context: ./services/schedule
     env_file:
-      - .env
-      - .postgres.env
+      - ./services/schedule/.env
+      - ./services/schedule/.postgres.env
     command:
       - /bin/sh
       - -c
@@ -90,9 +90,9 @@ services:
 
   cache-invalidator:
     build:
-      context: .
+      context: ./services/schedule
     env_file:
-      - .env
+      - ./services/schedule/.env
     command:
       - /bin/sh
       - -c
@@ -107,12 +107,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  api:
+  schedule-api:
     build:
-      context: .
+      context: ./services/schedule
     env_file:
-      - .env
-      - .postgres.env
+      - ./services/schedule/.env
+      - ./services/schedule/.postgres.env
     command:
       - /bin/sh
       - -c
@@ -140,5 +140,79 @@ services:
       retries: 5
       start_period: 5s
 
+  clickhouse:
+    env_file:
+      - ./services/analytics/.clickhouse.env
+    image: clickhouse/clickhouse-server:26.8
+    ports:
+      - "8123:8123"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  analytics-worker:
+    build:
+      context: ./services/analytics
+    env_file:
+      - ./services/analytics/.clickhouse.env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+    command:
+      - poetry
+      - run
+      - python
+      - -m
+      - analytics_service.workers.worker
+    depends_on:
+      kafka:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+  analytics-api:
+    build:
+      context: ./services/analytics
+    env_file:
+      - ./services/analytics/.clickhouse.env
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+    command:
+      - poetry
+      - run
+      - uvicorn
+      - analytics_service.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    ports:
+      - "8001:8000"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health/live')",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
 volumes:
   postgres_data:
+  clickhouse_data:

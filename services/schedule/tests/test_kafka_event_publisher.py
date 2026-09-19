@@ -17,7 +17,7 @@ async def test_kafka_publisher_sends_documented_json_envelope_with_lesson_key() 
     publisher = KafkaEventPublisher(producer=producer, topic="schedule.lessons")
     event = PendingOutboxEvent(
         id=42,
-        event_type="lesson.created",
+        event_type="lesson.snapshot",
         payload={"lesson_id": 501},
         created_at=datetime(2026, 9, 13, 12, tzinfo=UTC),
     )
@@ -26,6 +26,6 @@ async def test_kafka_publisher_sends_documented_json_envelope_with_lesson_key() 
 
     producer.send_and_wait.assert_awaited_once_with(
         "schedule.lessons",
-        b'{"event_id":42,"event_type":"lesson.created","occurred_at":"2026-09-13T12:00:00+00:00","payload":{"lesson_id":501}}',
+        b'{"event_id":42,"event_type":"lesson.snapshot","occurred_at":"2026-09-13T12:00:00+00:00","payload":{"lesson_id":501}}',
         key=b"501",
     )

@@ -7,7 +7,7 @@ from schedule_service.application.update_lesson import (
     UpdateLessonCommand,
     UpdateLessonHandler,
 )
-from schedule_service.domain.events import ScheduleChanged
+from schedule_service.domain.events import LessonSnapshot, ScheduleChanged
 from schedule_service.domain.lesson import Lesson
 
 
@@ -111,7 +111,17 @@ async def test_handler_reschedules_lesson_through_uow() -> None:
             lesson_id=501,
             class_id=10,
             affected_dates=(date(2026, 9, 10),),
-        )
+        ),
+        LessonSnapshot(
+            lesson_id=501,
+            class_id=10,
+            teacher_id=100,
+            subject_id=1000,
+            starts_at=command.starts_at,
+            ends_at=command.ends_at,
+            status="planned",
+            version=4,
+        ),
     ]
 
 
@@ -134,7 +144,17 @@ async def test_handler_invalidates_old_and_new_days_when_lesson_moves_day() -> N
             lesson_id=501,
             class_id=10,
             affected_dates=(date(2026, 9, 10), date(2026, 9, 11)),
-        )
+        ),
+        LessonSnapshot(
+            lesson_id=501,
+            class_id=10,
+            teacher_id=100,
+            subject_id=1000,
+            starts_at=datetime(2026, 9, 11, 12, tzinfo=UTC),
+            ends_at=datetime(2026, 9, 11, 13, tzinfo=UTC),
+            status="planned",
+            version=4,
+        ),
     ]
 
 

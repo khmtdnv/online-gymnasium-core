@@ -99,7 +99,7 @@ async def test_worker_commits_unrelated_event_without_invalidating_cache(
     message = SimpleNamespace(
         value=json.dumps(
             {
-                "event_type": "lesson.created",
+                "event_type": "lesson.snapshot",
                 "payload": {"lesson_id": 501},
             }
         ).encode()
