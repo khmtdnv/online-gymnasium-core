@@ -214,6 +214,67 @@ services:
       retries: 5
       start_period: 5s
 
+  documents-postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: documents
+      POSTGRES_PASSWORD: documents
+      POSTGRES_DB: documents
+    ports:
+      - "5433:5432"
+    volumes:
+      - documents_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U documents -d documents"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:4.1.8-management
+    environment:
+      RABBITMQ_DEFAULT_USER: documents
+      RABBITMQ_DEFAULT_PASS: documents
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: documents
+      MINIO_ROOT_PASSWORD: documents-password
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-03-12T17-29-24Z
+    env_file:
+      - ./services/documents/.env
+    entrypoint: []
+    command:
+      - /bin/sh
+      - -c
+      - >
+        mc alias set documents http://minio:9000 "$${MINIO_ACCESS_KEY}" "$${MINIO_SECRET_KEY}"
+        && mc mb --ignore-existing documents/"$${MINIO_BUCKET}"
+    depends_on:
+      minio:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   clickhouse_data:
+  documents_postgres_data:
+  minio_data:
