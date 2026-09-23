@@ -2,6 +2,9 @@ from datetime import UTC, datetime
 from typing import Self
 from uuid import UUID, uuid4
 
+import pytest
+
+from document_service.application.errors import PermanentDocumentError
 from document_service.application.generate_certificate import (
     GenerateCertificateCommand,
     GenerateCertificateHandler,
@@ -15,6 +18,7 @@ class FakeDocumentRepository:
         self._job = job
         self.processing_job_ids: list[UUID] = []
         self.completed_jobs: list[tuple[UUID, str]] = []
+        self.failed_jobs: list[tuple[UUID, str]] = []
 
     def get_job(self, job_id: UUID) -> DocumentJob | None:
         if self._job is not None and self._job.id == job_id:
@@ -26,6 +30,9 @@ class FakeDocumentRepository:
 
     def mark_completed(self, job_id: UUID, object_key: str) -> None:
         self.completed_jobs.append((job_id, object_key))
+
+    def mark_failed(self, job_id: UUID, error_message: str) -> None:
+        self.failed_jobs.append((job_id, error_message))
 
 
 class FakeUnitOfWork:
@@ -128,3 +135,57 @@ def test_handler_skips_already_completed_job() -> None:
     assert renderer.rendered_certificates == []
     assert storage.uploaded_pdfs == []
     assert repository.completed_jobs == []
+
+
+def test_handler_marks_job_failed_for_invalid_certificate_data() -> None:
+    job = make_pending_job()
+    job = DocumentJob(
+        id=job.id,
+        document_type=job.document_type,
+        status=job.status,
+        payload={
+            **job.payload,
+            "student_full_name": "   ",
+        },
+        object_key=job.object_key,
+        error_message=job.error_message,
+        created_at=job.created_at,
+    )
+    repository = FakeDocumentRepository(job)
+    handler = GenerateCertificateHandler(
+        uow_factory=lambda: FakeUnitOfWork(repository),
+        renderer=FakeCertificateRenderer(),
+        storage=FakeDocumentStorage(),
+    )
+
+    with pytest.raises(PermanentDocumentError):
+        handler.handle(GenerateCertificateCommand(job_id=job.id))
+
+    assert repository.failed_jobs == [(job.id, "Document generation failed")]
+
+
+def test_handler_marks_job_failed_for_missing_payload_field() -> None:
+    job = make_pending_job()
+    job = DocumentJob(
+        id=job.id,
+        document_type=job.document_type,
+        status=job.status,
+        payload={
+            "class_name": "7А",
+            "academic_year": "2026/2027",
+        },
+        object_key=job.object_key,
+        error_message=job.error_message,
+        created_at=job.created_at,
+    )
+    repository = FakeDocumentRepository(job)
+    handler = GenerateCertificateHandler(
+        uow_factory=lambda: FakeUnitOfWork(repository),
+        renderer=FakeCertificateRenderer(),
+        storage=FakeDocumentStorage(),
+    )
+
+    with pytest.raises(PermanentDocumentError):
+        handler.handle(GenerateCertificateCommand(job_id=job.id))
+
+    assert repository.failed_jobs == [(job.id, "Document generation failed")]

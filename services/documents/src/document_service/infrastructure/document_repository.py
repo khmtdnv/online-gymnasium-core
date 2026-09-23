@@ -63,6 +63,14 @@ class SqlAlchemyDocumentRepository:
         )
         self._session.execute(statement)
 
+    def mark_failed(self, job_id: UUID, error_message: str) -> None:
+        statement = (
+            update(DocumentJobRow)
+            .where(DocumentJobRow.id == job_id)
+            .values(status=DocumentStatus.FAILED.value, error_message=error_message)
+        )
+        self._session.execute(statement)
+
     @staticmethod
     def _to_document_job(row: DocumentJobRow) -> DocumentJob:
         return DocumentJob(

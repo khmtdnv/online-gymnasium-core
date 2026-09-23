@@ -6,13 +6,14 @@ from minio import Minio
 from document_service.application.generate_certificate import (
     GenerateCertificateHandler,
 )
+from document_service.application.mark_job_failed import MarkJobFailedHandler
 from document_service.config import DocumentSettings
 from document_service.infrastructure.celery_app import create_celery_app
 from document_service.infrastructure.celery_tasks import register_certificate_tasks
 from document_service.infrastructure.database import create_engine, session_factory
 from document_service.infrastructure.minio_storage import MinioDocumentStorage
 from document_service.infrastructure.renderer import create_certificate_renderer
-from document_service.infrastructure.uow import SqlAlchemyDocumentUnitOfWork
+from document_service.infrastructure.unit_of_work import SqlAlchemyDocumentUnitOfWork
 
 
 def create_worker_app(settings: DocumentSettings) -> Celery:
@@ -32,14 +33,21 @@ def create_worker_app(settings: DocumentSettings) -> Celery:
         Path(__file__).resolve().parents[3] / "templates",
     )
 
-    handler = GenerateCertificateHandler(
+    core_handler = GenerateCertificateHandler(
         uow_factory=lambda: SqlAlchemyDocumentUnitOfWork(sessions),
         renderer=renderer,
         storage=storage,
     )
+    mark_failed_handler = MarkJobFailedHandler(
+        uow_factory=lambda: SqlAlchemyDocumentUnitOfWork(sessions),
+    )
 
     celery_app = create_celery_app(settings)
-    register_certificate_tasks(celery_app=celery_app, handler_factory=lambda: handler)
+    register_certificate_tasks(
+        celery_app=celery_app,
+        handler_factory=lambda: core_handler,
+        failure_handler_factory=lambda: mark_failed_handler,
+    )
     return celery_app
 
 

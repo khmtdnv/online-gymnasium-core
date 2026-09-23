@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+from document_service.application.errors import (
+    PermanentDocumentError,
+)
 from document_service.application.ports.certificate_renderer import CertificateRenderer
 from document_service.application.ports.document_storage import DocumentStorage
 from document_service.application.ports.unit_of_work import DocumentUnitOfWorkFactory
-from document_service.domain.certificate import CertificateData
+from document_service.domain.certificate import CertificateData, InvalidCertificateData
 from document_service.domain.document import DocumentStatus
 
 
@@ -28,20 +31,27 @@ class GenerateCertificateHandler:
         with self._uow_factory() as uow:
             job = uow.documents.get_job(command.job_id)
 
-            if job is None:
-                return
-
-            if job.status is DocumentStatus.COMPLETED:
+            if (
+                job is None
+                or job.status is DocumentStatus.COMPLETED
+                or job.status is DocumentStatus.FAILED
+            ):
                 return
 
             uow.documents.mark_processing(command.job_id)
 
-        certificate = CertificateData(
-            student_full_name=job.payload["student_full_name"],
-            class_name=job.payload["class_name"],
-            academic_year=job.payload["academic_year"],
-        )
-        pdf_bytes = self._renderer.render(certificate)
+        try:
+            certificate = CertificateData(
+                student_full_name=job.payload["student_full_name"],
+                class_name=job.payload["class_name"],
+                academic_year=job.payload["academic_year"],
+            )
+            pdf_bytes = self._renderer.render(certificate)
+        except (InvalidCertificateData, KeyError) as exc:
+            with self._uow_factory() as uow:
+                uow.documents.mark_failed(command.job_id, "Document generation failed")
+
+            raise PermanentDocumentError from exc
 
         object_key = f"certificates/{command.job_id}.pdf"
         self._storage.put_pdf(object_key, pdf_bytes)

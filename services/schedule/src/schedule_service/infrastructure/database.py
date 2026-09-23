@@ -10,7 +10,5 @@ def create_engine(url: str) -> AsyncEngine:
     return create_async_engine(url=url)
 
 
-def create_session_factory(
-    engine: AsyncEngine,
-) -> async_sessionmaker[AsyncSession]:
+def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine, expire_on_commit=False)

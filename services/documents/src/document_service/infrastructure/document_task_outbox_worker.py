@@ -8,7 +8,7 @@ from document_service.config import DocumentSettings
 from document_service.infrastructure.celery_app import create_celery_app
 from document_service.infrastructure.celery_task_publisher import CeleryTaskPublisher
 from document_service.infrastructure.database import create_engine, session_factory
-from document_service.infrastructure.uow import SqlAlchemyDocumentUnitOfWork
+from document_service.infrastructure.unit_of_work import SqlAlchemyDocumentUnitOfWork
 
 logger = logging.getLogger(__name__)
 

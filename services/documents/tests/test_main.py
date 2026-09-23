@@ -13,7 +13,9 @@ def test_create_runtime_app_wires_postgres_uow_and_minio_storage(
     )
     monkeypatch.setenv("MINIO_ENDPOINT", "localhost:9000")
     from document_service.infrastructure.minio_storage import MinioDocumentStorage
-    from document_service.infrastructure.uow import SqlAlchemyDocumentUnitOfWork
+    from document_service.infrastructure.unit_of_work import (
+        SqlAlchemyDocumentUnitOfWork,
+    )
     from document_service.main import create_runtime_app
 
     settings = DocumentSettings(

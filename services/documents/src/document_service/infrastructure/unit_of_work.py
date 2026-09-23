@@ -3,10 +3,12 @@ from typing import Self
 
 from sqlalchemy.orm import Session
 
+from document_service.infrastructure.document_repository import (
+    SqlAlchemyDocumentRepository,
+)
 from document_service.infrastructure.document_task_outbox_repository import (
     SqlAlchemyDocumentTaskOutboxRepository,
 )
-from document_service.infrastructure.repositories import SqlAlchemyDocumentRepository
 
 type SessionFactory = Callable[[], Session]
 

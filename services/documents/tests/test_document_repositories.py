@@ -14,7 +14,7 @@ from document_service.infrastructure.models.document_task_outbox import (
 
 
 def test_repository_adds_pending_job_and_one_matching_outbox_row() -> None:
-    from document_service.infrastructure.repositories import (
+    from document_service.infrastructure.document_repository import (
         SqlAlchemyDocumentRepository,
     )
 
@@ -56,7 +56,9 @@ def test_repository_adds_pending_job_and_one_matching_outbox_row() -> None:
 
 
 def test_uow_commits_and_closes_session_after_success() -> None:
-    from document_service.infrastructure.uow import SqlAlchemyDocumentUnitOfWork
+    from document_service.infrastructure.unit_of_work import (
+        SqlAlchemyDocumentUnitOfWork,
+    )
 
     session = Mock(spec=Session)
     uow = SqlAlchemyDocumentUnitOfWork(session_factory=lambda: session)
@@ -70,7 +72,9 @@ def test_uow_commits_and_closes_session_after_success() -> None:
 
 
 def test_uow_rolls_back_and_closes_session_after_error() -> None:
-    from document_service.infrastructure.uow import SqlAlchemyDocumentUnitOfWork
+    from document_service.infrastructure.unit_of_work import (
+        SqlAlchemyDocumentUnitOfWork,
+    )
 
     session = Mock(spec=Session)
     uow = SqlAlchemyDocumentUnitOfWork(session_factory=lambda: session)
