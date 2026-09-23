@@ -1,5 +1,6 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from document_service.domain.certificate import CertificateData
@@ -35,11 +36,41 @@ class SqlAlchemyDocumentRepository:
         self._session.flush()
         self._session.refresh(job_row)
 
+        return self._to_document_job(job_row)
+
+    def get_job(self, job_id: UUID) -> DocumentJob | None:
+        statement = select(DocumentJobRow).where(DocumentJobRow.id == job_id)
+        row = self._session.scalar(statement)
+
+        if row is None:
+            return None
+
+        return self._to_document_job(row)
+
+    def mark_processing(self, job_id: UUID) -> None:
+        statement = (
+            update(DocumentJobRow)
+            .where(DocumentJobRow.id == job_id)
+            .values(status=DocumentStatus.PROCESSING.value)
+        )
+        self._session.execute(statement)
+
+    def mark_completed(self, job_id: UUID, object_key: str) -> None:
+        statement = (
+            update(DocumentJobRow)
+            .where(DocumentJobRow.id == job_id)
+            .values(status=DocumentStatus.COMPLETED.value, object_key=object_key)
+        )
+        self._session.execute(statement)
+
+    @staticmethod
+    def _to_document_job(row: DocumentJobRow) -> DocumentJob:
         return DocumentJob(
-            id=job_row.id,
-            document_type=job_row.document_type,
-            status=DocumentStatus(job_row.status),
-            object_key=job_row.object_key,
-            error_message=job_row.error_message,
-            created_at=job_row.created_at,
+            id=row.id,
+            document_type=row.document_type,
+            status=DocumentStatus(row.status),
+            payload=row.payload,
+            object_key=row.object_key,
+            error_message=row.error_message,
+            created_at=row.created_at,
         )

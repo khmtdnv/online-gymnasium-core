@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <title>Справка об обучении</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 30mm 25mm;
+      }
+
+      body {
+        font-family: sans-serif;
+        font-size: 14pt;
+        line-height: 1.5;
+      }
+
+      h1 {
+        text-align: center;
+        margin-bottom: 40px;
+      }
+
+      .date {
+        text-align: right;
+        margin-bottom: 30px;
+      }
+
+      .signature {
+        margin-top: 60px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Справка об обучении</h1>
+
+    <p>
+      Настоящая справка подтверждает, что
+      <strong>{{ student_full_name }}</strong>
+      обучается в <strong>{{ class_name }}</strong> классе
+      в <strong>{{ academic_year }}</strong> учебном году.
+    </p>
+
+    <p class="signature">
+      Руководитель образовательной организации __________________
+    </p>
+  </body>
+</html>

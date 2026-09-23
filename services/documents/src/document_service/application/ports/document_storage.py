@@ -1,0 +1,6 @@
+from typing import Protocol
+
+
+class DocumentStorage(Protocol):
+    def read(self, object_key: str) -> bytes: ...
+    def put_pdf(self, object_key: str, pdf_bytes: bytes) -> None: ...

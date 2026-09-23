@@ -23,6 +23,11 @@ def test_handler_creates_pending_job_and_matching_outbox_row() -> None:
                 id=uuid4(),
                 document_type="certificate",
                 status=DocumentStatus.PENDING,
+                payload={
+                    "student_full_name": certificate.student_full_name,
+                    "class_name": certificate.class_name,
+                    "academic_year": certificate.academic_year,
+                },
                 object_key=None,
                 error_message=None,
                 created_at=datetime(2026, 9, 21, tzinfo=UTC),

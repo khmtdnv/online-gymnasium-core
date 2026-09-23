@@ -3,6 +3,9 @@ from typing import Self
 
 from sqlalchemy.orm import Session
 
+from document_service.infrastructure.document_task_outbox_repository import (
+    SqlAlchemyDocumentTaskOutboxRepository,
+)
 from document_service.infrastructure.repositories import SqlAlchemyDocumentRepository
 
 type SessionFactory = Callable[[], Session]
@@ -15,6 +18,7 @@ class SqlAlchemyDocumentUnitOfWork:
     def __enter__(self) -> Self:
         self._session = self._session_factory()
         self.documents = SqlAlchemyDocumentRepository(self._session)
+        self.outbox = SqlAlchemyDocumentTaskOutboxRepository(self._session)
         return self
 
     def __exit__(

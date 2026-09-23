@@ -16,6 +16,7 @@ class DocumentJob:
     id: UUID
     document_type: str
     status: DocumentStatus
+    payload: dict[str, object]
     object_key: str | None
     error_message: str | None
     created_at: datetime
