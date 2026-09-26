@@ -353,8 +353,26 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  gateway-postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway
+      POSTGRES_DB: gateway
+    ports:
+      - "5434:5432"
+    volumes:
+      - gateway_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d gateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
 volumes:
   postgres_data:
   clickhouse_data:
   documents_postgres_data:
   minio_data:
+  gateway_postgres_data:
