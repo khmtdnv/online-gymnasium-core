@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class GatewaySettings(BaseSettings):
+    app_name: str = "Gateway-service"
+
     database_url: str
     jwt_secret: str
     backoffice_service_token: str

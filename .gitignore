@@ -5,6 +5,7 @@ __pycache__/
 .mypy_cache/
 .worktrees/
 **/docs/superpowers/
+.superpowers/
 
 *.pyc
 *.pyo
